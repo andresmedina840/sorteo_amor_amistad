@@ -1,6 +1,8 @@
 import { EventConfig, type CurrencyCode } from '../../core/domain/entities/EventConfig';
 import { Participant } from '../../core/domain/entities/Participant';
 import { DrawPair } from '../../core/domain/entities/DrawPair';
+import { SupabaseStorageService } from './SupabaseStorageService';
+import { isSupabaseConfigured } from './supabaseClient';
 
 export interface SavedParticipant {
   id: string;
@@ -146,6 +148,13 @@ export class LocalStorageAdapter {
 
       localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
       localStorage.setItem(ACTIVE_GROUP_ID_KEY, eventConfig.id);
+
+      // Sincronización en la nube con Supabase (PostgreSQL)
+      if (isSupabaseConfigured()) {
+        SupabaseStorageService.saveGroup(eventConfig, participants, pairs, step).catch(err => {
+          console.warn('Error sincronizando con Supabase:', err);
+        });
+      }
     } catch (e) {
       console.warn('Error al guardar grupo:', e);
     }
@@ -247,6 +256,10 @@ export class LocalStorageAdapter {
         } else {
           localStorage.removeItem(ACTIVE_GROUP_ID_KEY);
         }
+      }
+
+      if (isSupabaseConfigured()) {
+        SupabaseStorageService.deleteGroup(groupId).catch(() => {});
       }
     } catch (e) {
       console.warn('Error al eliminar grupo:', e);

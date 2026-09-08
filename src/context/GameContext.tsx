@@ -8,6 +8,9 @@ import { DrawUseCases, type ShareableItem } from '../core/application/useCases/D
 import { LocalStorageAdapter } from '../infrastructure/storage/LocalStorageAdapter';
 import { requestPinToDeleteGroup, showSuccessAlert } from '../core/domain/utils/alertUtils';
 
+import { SupabaseStorageService } from '../infrastructure/storage/SupabaseStorageService';
+import { isSupabaseConfigured } from '../infrastructure/storage/supabaseClient';
+
 interface GameContextType {
   // Estado
   eventConfig: EventConfig;
@@ -36,8 +39,11 @@ interface GameContextType {
   resetDraw: () => void;
   resetAll: () => void;
   deleteGroupWithPin: () => Promise<boolean>;
+  switchGroup: (groupId: string) => Promise<boolean>;
+  createNewGroup: (title?: string) => void;
   clearError: () => void;
 }
+
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
@@ -255,7 +261,61 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   };
 
+  /**
+   * Cambia al grupo indicado cargándolo desde Supabase o LocalStorage
+   */
+  const switchGroup = async (groupId: string): Promise<boolean> => {
+    try {
+      // 1. Intentar cargar desde Supabase si está activo
+      if (isSupabaseConfigured()) {
+        const cloudGroup = await SupabaseStorageService.loadGroup(groupId);
+        if (cloudGroup) {
+          setEventConfig(cloudGroup.eventConfig);
+          setParticipants(cloudGroup.participants);
+          setPairs(cloudGroup.pairs);
+          setStep(cloudGroup.step);
+          LocalStorageAdapter.setActiveGroupId(groupId);
+          return true;
+        }
+      }
+
+      // 2. Cargar desde LocalStorage
+      const localGroup = LocalStorageAdapter.loadGroup(groupId);
+      if (localGroup) {
+        setEventConfig(localGroup.eventConfig);
+        setParticipants(localGroup.participants);
+        setPairs(localGroup.pairs);
+        setStep(localGroup.step);
+        LocalStorageAdapter.setActiveGroupId(groupId);
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.warn('Error al cambiar de grupo:', err);
+      return false;
+    }
+  };
+
+  /**
+   * Crea un nuevo grupo limpio
+   */
+  const createNewGroup = (title?: string) => {
+    const created = LocalStorageAdapter.createNewGroup(title);
+    setEventConfig(created.eventConfig);
+    setParticipants(created.participants);
+    setPairs(created.pairs);
+    setShareableItems([]);
+    setStep(1);
+    setErrorMessage(null);
+
+    if (isSupabaseConfigured()) {
+      SupabaseStorageService.saveGroup(created.eventConfig, [], null, 1).catch(() => {});
+    }
+  };
+
   const clearError = () => setErrorMessage(null);
+
 
   return (
     <GameContext.Provider
@@ -278,6 +338,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         resetDraw,
         resetAll,
         deleteGroupWithPin,
+        switchGroup,
+        createNewGroup,
         clearError,
       }}
     >

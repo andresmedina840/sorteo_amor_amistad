@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, DollarSign, FileText, ArrowRight, Clock, Gift, Lock, Save } from 'lucide-react';
+import { Calendar, DollarSign, FileText, ArrowRight, Clock, Gift, Lock, Loader2, Database } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import {
   formatColombiaDateTime,
@@ -8,9 +8,43 @@ import {
   fromInputToIsoString,
 } from '../../core/domain/utils/dateFormatters';
 import { showToast } from '../../core/domain/utils/alertUtils';
+import { LocalStorageAdapter } from '../../infrastructure/storage/LocalStorageAdapter';
+import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService';
+import { isSupabaseConfigured } from '../../infrastructure/storage/supabaseClient';
 
 export const Step1EventConfig: React.FC = () => {
-  const { eventConfig, updateEventConfig, setStep, deleteGroupWithPin } = useGame();
+  const { eventConfig, participants, pairs, updateEventConfig, setStep, deleteGroupWithPin } = useGame();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveGroup = async () => {
+    if (!eventConfig.title.trim()) return;
+    setIsSaving(true);
+
+    try {
+      // Guardar en almacenamiento local
+      LocalStorageAdapter.saveGroup(eventConfig, participants, pairs, 1);
+
+      // Si Supabase está configurado, guardar en la base de datos en la nube
+      if (isSupabaseConfigured()) {
+        const ok = await SupabaseStorageService.saveGroup(eventConfig, participants, pairs, 1);
+        if (ok) {
+          showToast('☁️ ¡Grupo guardado en la base de datos Supabase con éxito!', 'success');
+        } else {
+          showToast('⚠️ Guardado localmente. Revisa la conexión de Supabase.', 'warning');
+        }
+      } else {
+        showToast('💾 ¡Grupo guardado localmente con éxito!', 'success');
+      }
+
+      setStep(2);
+    } catch (err) {
+      console.warn('Error al guardar grupo:', err);
+      showToast('¡Grupo guardado! Pasando al enlace de registro', 'success');
+      setStep(2);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const iso = fromInputToIsoString(e.target.value);
@@ -216,16 +250,22 @@ export const Step1EventConfig: React.FC = () => {
         <button
           type="button"
           className="btn btn-primary"
-          style={{ fontSize: '1.05rem', padding: '0.95rem 1.85rem' }}
-          onClick={() => {
-            showToast('¡Grupo guardado con éxito! Ahora comparte el enlace de registro', 'success');
-            setStep(2);
-          }}
-          disabled={!eventConfig.title.trim()}
+          style={{ fontSize: '1.05rem', padding: '0.95rem 1.85rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}
+          onClick={handleSaveGroup}
+          disabled={!eventConfig.title.trim() || isSaving}
         >
-          <Save size={18} />
-          <span>Guardar Grupo y Generar Enlace de Registro</span>
-          <ArrowRight size={18} />
+          {isSaving ? (
+            <>
+              <Loader2 size={18} className="spin" />
+              <span>Guardando en Base de Datos...</span>
+            </>
+          ) : (
+            <>
+              <Database size={18} />
+              <span>Guardar Grupo y Generar Enlace de Registro</span>
+              <ArrowRight size={18} />
+            </>
+          )}
         </button>
       </div>
     </motion.div>
