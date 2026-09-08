@@ -137,15 +137,14 @@ export const Step2PlayerRegistration: React.FC = () => {
   const whatsappInviteMessage = 
 `💌 *¡Te invito a jugar Amor y Amistad: ${eventConfig.title}!* 🎁✨
 
-💰 *Presupuesto máximo:* ${eventConfig.getFormattedBudget()}
-🗓️ *Fecha de entrega:* ${eventConfig.getFormattedDeliveryDate()}
+💰 *Presupuesto:* ${eventConfig.getFormattedBudget()}
+🗓️ *Entrega:* ${eventConfig.getFormattedDeliveryDate()}
 
-👉 *Entra a este enlace para registrarte y colocar qué regalos te gustaría recibir:*
-${inviteUrl}
-
-¡Tu registro es 100% automático! No te quedes por fuera 🥳`;
+👉 *Toca aquí para registrarte:*
+${inviteUrl}`;
 
   const whatsappInviteUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappInviteMessage)}`;
+
 
   const handleAddManual = (e: React.FormEvent) => {
     e.preventDefault();

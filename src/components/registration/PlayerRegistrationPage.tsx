@@ -23,22 +23,24 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
   const [isLoadingEvent, setIsLoadingEvent] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  // Cargar datos del evento: formato nuevo (cloudRoomId corto) o legacy (Base64)
+  // Cargar datos del evento: formato compacto, Supabase o legacy
   useEffect(() => {
     const loadEventData = async () => {
       setIsLoadingEvent(true);
       setLoadError(false);
 
-      // Intentar formato legacy (Base64) primero
-      const legacyData = syncService.decodeInvite(inviteToken);
+      const cleanToken = inviteToken ? decodeURIComponent(inviteToken).trim().replace(/^#registro=/, '') : '';
+
+      // 1. Intentar decodificar como token compacto o Base64
+      const legacyData = syncService.decodeInvite(cleanToken);
       if (legacyData) {
         setEventDetails(legacyData);
         setIsLoadingEvent(false);
         return;
       }
 
-      // Formato nuevo: el token es un cloudRoomId directo → cargar desde la nube
-      const cloudData = await syncService.fetchEventFromCloud(inviteToken);
+      // 2. Consultar en la nube (Supabase o almacenamiento local)
+      const cloudData = await syncService.fetchEventFromCloud(cleanToken);
       if (cloudData) {
         setEventDetails(cloudData);
       } else {
