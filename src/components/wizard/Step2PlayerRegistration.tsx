@@ -13,8 +13,11 @@ export const Step2PlayerRegistration: React.FC = () => {
   const [cloudRoomId, setCloudRoomId] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Formulario manual opcional
-  const [manualName, setManualName] = useState('');
+  // Formulario manual opcional con nombres y apellidos separados en mayúsculas
+  const [manualFirstName, setManualFirstName] = useState('');
+  const [manualSecondName, setManualSecondName] = useState('');
+  const [manualFirstLastName, setManualFirstLastName] = useState('');
+  const [manualSecondLastName, setManualSecondLastName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [manualWish, setManualWish] = useState('');
 
@@ -53,7 +56,7 @@ export const Step2PlayerRegistration: React.FC = () => {
           );
           if (!alreadyExists) {
             addParticipant({
-              name: player.name.trim(),
+              name: player.name.trim().toUpperCase(),
               phone: player.phone?.trim() || undefined,
               giftWish: player.giftWish?.trim() || undefined,
             });
@@ -96,7 +99,7 @@ export const Step2PlayerRegistration: React.FC = () => {
               );
               if (!alreadyExists) {
                 addParticipant({
-                  name: player.name.trim(),
+                  name: player.name.trim().toUpperCase(),
                   phone: player.phone?.trim() || undefined,
                   giftWish: player.giftWish?.trim() || undefined,
                 });
@@ -105,7 +108,6 @@ export const Step2PlayerRegistration: React.FC = () => {
             }
           }
         } catch {
-          // Si el formato es plano, sincronizar con la nube
           syncWithCloud();
         }
       };
@@ -147,10 +149,23 @@ ${inviteUrl}
 
   const handleAddManual = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualName.trim()) {
-      showToast('Por favor escribe el nombre del jugador', 'warning');
+    const cleanFirst = manualFirstName.trim().toUpperCase();
+    const cleanSecond = manualSecondName.trim().toUpperCase();
+    const cleanLast1 = manualFirstLastName.trim().toUpperCase();
+    const cleanLast2 = manualSecondLastName.trim().toUpperCase();
+
+    if (!cleanFirst) {
+      showToast('Por favor escribe el PRIMER NOMBRE', 'warning');
       return;
     }
+    if (!cleanLast1) {
+      showToast('Por favor escribe el PRIMER APELLIDO', 'warning');
+      return;
+    }
+
+    const fullUpperName = [cleanFirst, cleanSecond, cleanLast1, cleanLast2]
+      .filter(Boolean)
+      .join(' ');
 
     let cleanPhone: string | undefined = undefined;
     if (manualPhone.trim()) {
@@ -163,15 +178,18 @@ ${inviteUrl}
     }
 
     addParticipant({
-      name: manualName.trim(),
+      name: fullUpperName,
       phone: cleanPhone,
       giftWish: manualWish.trim() || undefined,
     });
 
-    setManualName('');
+    setManualFirstName('');
+    setManualSecondName('');
+    setManualFirstLastName('');
+    setManualSecondLastName('');
     setManualPhone('');
     setManualWish('');
-    showToast(`¡${manualName.trim()} agregado a la lista!`, 'success');
+    showToast(`¡${fullUpperName} agregado a la lista!`, 'success');
   };
 
   const handleRemove = async (participant: Participant) => {
@@ -391,18 +409,55 @@ ${inviteUrl}
           ➕ ¿Deseas agregar a alguien manualmente que no tenga celular? (Clic aquí)
         </summary>
         <form onSubmit={handleAddManual} style={{ marginTop: '1rem' }}>
-          <div className="form-grid">
+          <div className="form-grid" style={{ marginBottom: '1rem' }}>
             <div className="form-group">
-              <label className="form-label">Nombre del Jugador *</label>
+              <label className="form-label">PRIMER NOMBRE *</label>
               <input
                 type="text"
                 className="form-input"
-                value={manualName}
-                onChange={e => setManualName(e.target.value)}
-                placeholder="Ej: Abuelita Carmen"
+                style={{ textTransform: 'uppercase' }}
+                value={manualFirstName}
+                onChange={e => setManualFirstName(e.target.value.toUpperCase())}
+                placeholder="EJ: CARLOS"
                 required
               />
             </div>
+            <div className="form-group">
+              <label className="form-label">SEGUNDO NOMBRE (OPCIONAL)</label>
+              <input
+                type="text"
+                className="form-input"
+                style={{ textTransform: 'uppercase' }}
+                value={manualSecondName}
+                onChange={e => setManualSecondName(e.target.value.toUpperCase())}
+                placeholder="EJ: ALBERTO"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">PRIMER APELLIDO *</label>
+              <input
+                type="text"
+                className="form-input"
+                style={{ textTransform: 'uppercase' }}
+                value={manualFirstLastName}
+                onChange={e => setManualFirstLastName(e.target.value.toUpperCase())}
+                placeholder="EJ: GÓMEZ"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">SEGUNDO APELLIDO (OPCIONAL)</label>
+              <input
+                type="text"
+                className="form-input"
+                style={{ textTransform: 'uppercase' }}
+                value={manualSecondLastName}
+                onChange={e => setManualSecondLastName(e.target.value.toUpperCase())}
+                placeholder="EJ: PÉREZ"
+              />
+            </div>
+          </div>
+          <div className="form-grid">
             <div className="form-group">
               <label className="form-label">WhatsApp / Celular (10 dígitos empezando en 3)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

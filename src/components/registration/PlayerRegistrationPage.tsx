@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Gift, Calendar, DollarSign, UserCheck, ArrowLeft, CheckCircle2, AlertCircle, Sparkles, Loader2, Phone } from 'lucide-react';
+import { Gift, Calendar, DollarSign, UserCheck, ArrowLeft, CheckCircle2, AlertCircle, Sparkles, Loader2, Phone, User } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { RegistrationSyncService } from '../../infrastructure/services/RegistrationSyncService';
 import { formatColombiaDateTime } from '../../core/domain/utils/dateFormatters';
@@ -18,7 +18,14 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
   const syncService = useMemo(() => new RegistrationSyncService(), []);
   const eventDetails = useMemo(() => syncService.decodeInvite(inviteToken), [inviteToken, syncService]);
 
-  const [name, setName] = useState('');
+  // Nombres y Apellidos separados (Todo en Mayúsculas)
+  const [firstName, setFirstName] = useState('');
+  const [secondName, setSecondName] = useState('');
+  const [firstLastName, setFirstLastName] = useState('');
+  const [secondLastName, setSecondLastName] = useState('');
+
+  const [registeredFullName, setRegisteredFullName] = useState('');
+
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [giftWish, setGiftWish] = useState('');
@@ -44,10 +51,8 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
   const formattedBudget = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(eventDetails.maxBudget);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Permitir solo números y limitar a 10 dígitos
     let val = e.target.value.replace(/\D/g, '');
     
-    // Si pegan con prefijo 57 y tiene más de 10 dígitos
     if (val.length > 10 && val.startsWith('57')) {
       val = val.substring(2);
     }
@@ -58,7 +63,6 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
     
     setPhone(val);
 
-    // Validación interactiva
     if (val.length > 0 && !val.startsWith('3')) {
       setPhoneError('En Colombia el celular debe iniciar por el número 3 (ej: 300, 315, 320...)');
     } else if (val.length > 0 && val.length < 10) {
@@ -70,11 +74,26 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      showToast('Por favor escribe tu nombre completo', 'warning');
+
+    const cleanFirstName = firstName.trim().toUpperCase();
+    const cleanSecondName = secondName.trim().toUpperCase();
+    const cleanFirstLastName = firstLastName.trim().toUpperCase();
+    const cleanSecondLastName = secondLastName.trim().toUpperCase();
+
+    if (!cleanFirstName) {
+      showToast('Por favor escribe tu PRIMER NOMBRE', 'warning');
       return;
     }
+
+    if (!cleanFirstLastName) {
+      showToast('Por favor escribe tu PRIMER APELLIDO', 'warning');
+      return;
+    }
+
+    // Nombre completo unificado en MAYÚSCULAS
+    const fullUpperName = [cleanFirstName, cleanSecondName, cleanFirstLastName, cleanSecondLastName]
+      .filter(Boolean)
+      .join(' ');
 
     // Validación estricta del número de celular en Colombia
     const phoneValidation = validateColombiaPhone(phone);
@@ -97,7 +116,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
     // 1. Agregar a la sesión local por si comparte el mismo navegador
     try {
       addParticipant({
-        name: trimmedName,
+        name: fullUpperName,
         phone: cleanPhoneNumber,
         giftWish: giftWish.trim() || undefined,
       });
@@ -107,7 +126,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
     const playerData = {
       id: 'pl_' + Math.random().toString(36).substring(2, 9),
       eventId: eventDetails.eventId,
-      name: trimmedName,
+      name: fullUpperName,
       phone: cleanPhoneNumber,
       giftWish: giftWish.trim(),
       registeredAt: Date.now(),
@@ -116,6 +135,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
     const cloudSuccess = await syncService.registerPlayerInCloud(eventDetails.cloudRoomId, playerData);
 
     setIsSubmitting(false);
+    setRegisteredFullName(fullUpperName);
     setIsRegistered(true);
 
     confetti({
@@ -127,13 +147,13 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
 
     if (cloudSuccess) {
       showSuccessAlert(
-        `¡Registro Exitoso, ${trimmedName}!`,
-        `Te has inscrito <strong>100% automáticamente</strong> en el sorteo de <strong>${eventDetails.eventTitle}</strong>.<br/><br/>Tu WhatsApp <strong>+57 ${formatColombiaPhone(cleanPhoneNumber)}</strong> y lista de regalos ya están guardados en la pantalla del organizador. <strong>Ya puedes cerrar esta ventana con total tranquilidad.</strong>`
+        `¡Registro Exitoso!`,
+        `Te has inscrito <strong>100% automáticamente</strong> como <strong>${fullUpperName}</strong> en el sorteo de <strong>${eventDetails.eventTitle}</strong>.<br/><br/>Tu WhatsApp <strong>+57 ${formatColombiaPhone(cleanPhoneNumber)}</strong> y lista de regalos ya están guardados en la pantalla del organizador. <strong>Ya puedes cerrar esta ventana con total tranquilidad.</strong>`
       );
     } else {
       showSuccessAlert(
-        `¡Registro Recibido, ${trimmedName}!`,
-        `Tu inscripción para <strong>${eventDetails.eventTitle}</strong> ha sido procesada. Puedes cerrar esta ventana con total tranquilidad.`
+        `¡Registro Recibido!`,
+        `Tu inscripción como <strong>${fullUpperName}</strong> para <strong>${eventDetails.eventTitle}</strong> ha sido procesada. Puedes cerrar esta ventana con total tranquilidad.`
       );
     }
   };
@@ -144,7 +164,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.35 }}
-      style={{ maxWidth: '640px', margin: '0 auto' }}
+      style={{ maxWidth: '680px', margin: '0 auto' }}
     >
       <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
         <div className="brand-badge">
@@ -193,26 +213,89 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
 
       {!isRegistered ? (
         <form onSubmit={handleSubmit}>
-          <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-            <label className="form-label" htmlFor="player-name">
-              <span>Tu Nombre y Apellido *</span>
-            </label>
-            <input
-              id="player-name"
-              type="text"
-              className="form-input"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Ej: Laura Gómez"
-              required
-              disabled={isSubmitting}
-            />
+          {/* Sección de Nombres y Apellidos Separados en Mayúsculas */}
+          <div style={{ marginBottom: '1.5rem', background: 'rgba(255, 255, 255, 0.02)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fb7185', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <User size={15} />
+              <span>DATOS DEL PARTICIPANTE (TODO EN MAYÚSCULAS)</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="first-name">
+                  <span>PRIMER NOMBRE *</span>
+                </label>
+                <input
+                  id="first-name"
+                  type="text"
+                  className="form-input"
+                  style={{ textTransform: 'uppercase' }}
+                  value={firstName}
+                  onChange={e => setFirstName(e.target.value.toUpperCase())}
+                  placeholder="EJ: LAURA"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="second-name">
+                  <span>SEGUNDO NOMBRE (OPCIONAL)</span>
+                </label>
+                <input
+                  id="second-name"
+                  type="text"
+                  className="form-input"
+                  style={{ textTransform: 'uppercase' }}
+                  value={secondName}
+                  onChange={e => setSecondName(e.target.value.toUpperCase())}
+                  placeholder="EJ: ANDREA"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="first-last-name">
+                  <span>PRIMER APELLIDO *</span>
+                </label>
+                <input
+                  id="first-last-name"
+                  type="text"
+                  className="form-input"
+                  style={{ textTransform: 'uppercase' }}
+                  value={firstLastName}
+                  onChange={e => setFirstLastName(e.target.value.toUpperCase())}
+                  placeholder="EJ: GÓMEZ"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="second-last-name">
+                  <span>SEGUNDO APELLIDO (OPCIONAL)</span>
+                </label>
+                <input
+                  id="second-last-name"
+                  type="text"
+                  className="form-input"
+                  style={{ textTransform: 'uppercase' }}
+                  value={secondLastName}
+                  onChange={e => setSecondLastName(e.target.value.toUpperCase())}
+                  placeholder="EJ: RESTREPO"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
           </div>
 
+          {/* Campo de WhatsApp Colombia */}
           <div className="form-group" style={{ marginBottom: '1.25rem' }}>
             <label className="form-label" htmlFor="player-phone">
               <Phone size={15} color="#4ade80" />
-              <span>Número de WhatsApp / Celular (Colombia) *</span>
+              <span>NÚMERO DE WHATSAPP / CELULAR (COLOMBIA) *</span>
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div
@@ -267,7 +350,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
           <div className="form-group" style={{ marginBottom: '1.75rem' }}>
             <label className="form-label" htmlFor="player-wish">
               <Gift size={15} color="#fbbf24" />
-              <span>¿Qué regalos o gustos tienes? (Lista de Deseos) *</span>
+              <span>¿QUÉ REGALOS O GUSTOS TIENES? (LISTA DE DESEOS) *</span>
             </label>
             <textarea
               id="player-wish"
@@ -328,7 +411,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
           </div>
 
           <h3 style={{ fontSize: '1.8rem', color: '#fff', marginBottom: '0.5rem' }}>
-            ¡Listo, {name}!
+            ¡Listo, {registeredFullName}!
           </h3>
           
           <div
@@ -345,10 +428,10 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
             <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
               RESUMEN DE TU INSCRIPCIÓN:
             </div>
-            <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#fff' }}>
-              👤 {name}
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>
+              👤 {registeredFullName}
             </div>
-            <div style={{ fontSize: '0.95rem', color: '#4ade80', marginTop: '0.25rem', fontWeight: 600 }}>
+            <div style={{ fontSize: '0.95rem', color: '#4ade80', marginTop: '0.35rem', fontWeight: 600 }}>
               📱 🇨🇴 +57 {formatColombiaPhone(phone)}
             </div>
             <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
