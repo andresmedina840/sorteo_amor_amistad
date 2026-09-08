@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderKanban, Plus, Check, Trash2, Calendar, Users, DollarSign, X, ExternalLink, RefreshCw } from 'lucide-react';
+import { FolderKanban, Plus, Check, Trash2, Calendar, Users, DollarSign, X, RefreshCw } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { LocalStorageAdapter, type GroupSummary } from '../../infrastructure/storage/LocalStorageAdapter';
 import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService';
@@ -11,10 +11,9 @@ import { showToast, showConfirmDialog } from '../../core/domain/utils/alertUtils
 interface GroupManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenDbConfig: () => void;
 }
 
-export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, onClose, onOpenDbConfig }) => {
+export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, onClose }) => {
   const { eventConfig, switchGroup, createNewGroup } = useGame();
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -306,40 +305,21 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
             )}
           </div>
 
-          {/* Pie del modal con enlace a configuración de Base de Datos */}
+          {/* Pie del modal: estado de sincronización */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               paddingTop: '1rem',
               borderTop: '1px solid var(--border-subtle)',
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
+              color: 'var(--text-muted)',
             }}
           >
-            <span style={{ color: 'var(--text-muted)' }}>
-              {isSupabaseConfigured() ? '☁️ Sincronizado con Supabase' : '💾 Modo Almacenamiento Local'}
+            <span>
+              {isSupabaseConfigured() ? '☁️ Sincronización en la nube activa (Supabase)' : '💾 Almacenamiento local seguro'}
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenDbConfig();
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#38bdf8',
-                cursor: 'pointer',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-              }}
-            >
-              <span>Configurar Base de Datos</span>
-              <ExternalLink size={13} />
-            </button>
           </div>
         </motion.div>
       </div>
