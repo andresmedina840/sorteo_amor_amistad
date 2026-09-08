@@ -93,6 +93,17 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
         await SupabaseStorageService.deleteGroup(groupId);
       }
       showToast(`Grupo "${title}" eliminado`, 'success');
+
+      // Si se eliminó el grupo que estaba activo en pantalla, cargar otro
+      if (groupId === eventConfig.id) {
+        const remaining = groups.filter(g => g.id !== groupId);
+        if (remaining.length > 0) {
+          await switchGroup(remaining[0].id);
+        } else {
+          createNewGroup();
+        }
+      }
+
       loadAllGroups();
     }
   };
@@ -113,7 +124,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9999,
+          zIndex: 1050,
           padding: '1rem',
         }}
         onClick={onClose}

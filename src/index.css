@@ -6,3 +6,9 @@ html, body, #root {
   margin: 0;
   padding: 0;
 }
+
+/* Diálogos y alertas de confirmación siempre al frente de cualquier modal */
+.swal2-container {
+  z-index: 100000 !important;
+}
+

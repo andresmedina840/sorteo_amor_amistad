@@ -496,8 +496,13 @@ ${inviteUrl}`;
           type="button"
           className="btn btn-primary"
           style={{ fontSize: '1.05rem', padding: '0.9rem 1.8rem' }}
-          onClick={() => setStep(3)}
-          disabled={participants.length < 3}
+          onClick={() => {
+            if (participants.length < 2) {
+              showToast('Registra al menos 2 participantes para poder asignar familiares', 'warning');
+              return;
+            }
+            setStep(3);
+          }}
         >
           <span>Ya están todos registrados → Continuar a Asignar Familiares</span>
           <ArrowRight size={18} />

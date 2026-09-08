@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Sparkles, Heart, RotateCcw, FolderKanban } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { GroupManagerModal } from '../modals/GroupManagerModal';
+import { showToast } from '../../core/domain/utils/alertUtils';
 
 export const Header: React.FC = () => {
-  const { step, setStep, pairs, eventConfig, deleteGroupWithPin } = useGame();
+  const { step, setStep, pairs, eventConfig, deleteGroupWithPin, participants } = useGame();
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
   const steps = [
@@ -78,11 +79,23 @@ export const Header: React.FC = () => {
               type="button"
               className={`step-pill ${isCurrent ? 'active' : ''} ${isDone ? 'completed' : ''}`}
               onClick={() => {
-                if (s.num < step || pairs) {
+                if (s.num === 1 || s.num === 2) {
                   setStep(s.num);
+                } else if (s.num === 3) {
+                  if (participants.length < 2) {
+                    showToast('Registra al menos 2 jugadores para poder asignar familiares', 'warning');
+                    return;
+                  }
+                  setStep(3);
+                } else if (s.num === 4) {
+                  if (participants.length < 3) {
+                    showToast('Se requieren al menos 3 jugadores para realizar el sorteo', 'warning');
+                    return;
+                  }
+                  setStep(4);
                 }
               }}
-              style={{ cursor: s.num <= step || pairs ? 'pointer' : 'default' }}
+              style={{ cursor: 'pointer' }}
             >
               <span className="step-number">{s.num}</span>
               <span>{s.title}</span>
