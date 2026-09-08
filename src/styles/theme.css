@@ -99,15 +99,16 @@ h1, h2, h3, h4, h5, h6 {
   background: rgba(225, 29, 72, 0.7);
 }
 
-/* Layout General */
+/* Layout General Full-Width Responsivo */
 .app-container {
-  max-width: 1080px;
+  max-width: min(1560px, 96vw);
   margin: 0 auto;
-  padding: clamp(1rem, 3vw, 2rem) clamp(0.75rem, 3vw, 1.5rem) 4rem;
+  padding: clamp(0.75rem, 2vw, 1.5rem) clamp(0.75rem, 2.5vw, 2rem) 4rem;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   width: 100%;
+  box-sizing: border-box;
 }
 
 /* Header de la Aplicación */
@@ -393,8 +394,8 @@ h1, h2, h3, h4, h5, h6 {
 /* Lista y Tarjetas de Participantes (Responsive Grid) */
 .participants-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 1.15rem;
   width: 100%;
 }
 

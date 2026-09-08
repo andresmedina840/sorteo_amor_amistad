@@ -6,7 +6,7 @@ import { LocalStorageAdapter, type GroupSummary } from '../../infrastructure/sto
 import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService';
 import { isSupabaseConfigured } from '../../infrastructure/storage/supabaseClient';
 import { formatColombiaDateTime } from '../../core/domain/utils/dateFormatters';
-import { showToast, showConfirmDialog } from '../../core/domain/utils/alertUtils';
+import { showToast } from '../../core/domain/utils/alertUtils';
 
 interface GroupManagerModalProps {
   isOpen: boolean;
@@ -17,6 +17,7 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
   const { eventConfig, switchGroup, createNewGroup } = useGame();
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [groupToDelete, setGroupToDelete] = useState<{ id: string; title: string } | null>(null);
 
   const loadAllGroups = async () => {
     setIsLoading(true);
@@ -77,22 +78,19 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
     onClose();
   };
 
-  const handleDeleteGroup = async (groupId: string, title: string, e: React.MouseEvent) => {
+  const handleRequestDelete = (groupId: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    setGroupToDelete({ id: groupId, title });
+  };
 
-    const confirmed = await showConfirmDialog(
-      '¿Eliminar Grupo?',
-      `¿Estás seguro de que deseas eliminar permanentemente el grupo "${title}"? Esta acción no se puede deshacer.`,
-      'Sí, eliminar',
-      'Cancelar'
-    );
-
-    if (confirmed) {
+  const handleConfirmDelete = async (groupId: string, title: string) => {
+    try {
       LocalStorageAdapter.deleteGroup(groupId);
       if (isSupabaseConfigured()) {
         await SupabaseStorageService.deleteGroup(groupId);
       }
       showToast(`Grupo "${title}" eliminado`, 'success');
+      setGroupToDelete(null);
 
       // Si se eliminó el grupo que estaba activo en pantalla, cargar otro
       if (groupId === eventConfig.id) {
@@ -105,6 +103,8 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
       }
 
       loadAllGroups();
+    } catch {
+      showToast('Error al eliminar el grupo', 'warning');
     }
   };
 
@@ -220,96 +220,136 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
                 return (
                   <div
                     key={group.id}
-                    onClick={() => handleSelectGroup(group.id)}
                     style={{
                       padding: '1rem 1.25rem',
                       borderRadius: 'var(--radius-md)',
                       background: isActive ? 'rgba(225, 29, 72, 0.12)' : 'rgba(255, 255, 255, 0.03)',
                       border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border-subtle)'}`,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
                       transition: 'all 0.2s ease',
-                      gap: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
-                        <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: isActive ? '#fb7185' : 'var(--text-primary)' }}>
-                          {group.title}
-                        </h4>
-                        {isActive && (
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              background: 'var(--primary)',
-                              color: '#fff',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '999px',
-                            }}
-                          >
-                            Activo
-                          </span>
-                        )}
-                        {group.hasDrawn && (
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              background: 'rgba(34, 197, 94, 0.2)',
-                              color: '#22c55e',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '999px',
-                            }}
-                          >
-                            Sorteado 🎉
-                          </span>
-                        )}
-                      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => handleSelectGroup(group.id)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: isActive ? '#fb7185' : 'var(--text-primary)' }}>
+                            {group.title}
+                          </h4>
+                          {isActive && (
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                background: 'var(--primary)',
+                                color: '#fff',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '999px',
+                              }}
+                            >
+                              Activo
+                            </span>
+                          )}
+                          {group.hasDrawn && (
+                            <span
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                background: 'rgba(34, 197, 94, 0.2)',
+                                color: '#22c55e',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '999px',
+                              }}
+                            >
+                              Sorteado 🎉
+                            </span>
+                          )}
+                        </div>
 
-                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <Users size={13} color="#38bdf8" />
-                          <span>{group.participantsCount} participantes</span>
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <DollarSign size={13} color="#fbbf24" />
-                          <span>${new Intl.NumberFormat('es-CO').format(group.maxBudget)} COP</span>
-                        </span>
-                        {group.deliveryDateIso && (
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <Calendar size={13} color="#a78bfa" />
-                            <span>{formatColombiaDateTime(group.deliveryDateIso)}</span>
+                            <Users size={13} color="#38bdf8" />
+                            <span>{group.participantsCount} participantes</span>
                           </span>
-                        )}
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <DollarSign size={13} color="#fbbf24" />
+                            <span>${new Intl.NumberFormat('es-CO').format(group.maxBudget)} COP</span>
+                          </span>
+                          {group.deliveryDateIso && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <Calendar size={13} color="#a78bfa" />
+                              <span>{formatColombiaDateTime(group.deliveryDateIso)}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <button
-                        type="button"
-                        className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
-                        onClick={() => handleSelectGroup(group.id)}
-                      >
-                        {isActive ? <Check size={14} /> : null}
-                        <span>{isActive ? 'En pantalla' : 'Abrir'}</span>
-                      </button>
-
-                      {groups.length > 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <button
                           type="button"
-                          className="btn btn-danger-outline"
-                          style={{ padding: '0.45rem', fontSize: '0.82rem' }}
-                          title="Eliminar este grupo"
-                          onClick={e => handleDeleteGroup(group.id, group.title, e)}
+                          className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
+                          onClick={() => handleSelectGroup(group.id)}
                         >
-                          <Trash2 size={14} />
+                          {isActive ? <Check size={14} /> : null}
+                          <span>{isActive ? 'En pantalla' : 'Abrir'}</span>
                         </button>
-                      )}
+
+                        {groups.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn btn-danger-outline"
+                            style={{ padding: '0.45rem', fontSize: '0.82rem' }}
+                            title="Eliminar este grupo"
+                            onClick={e => handleRequestDelete(group.id, group.title, e)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Confirmación en línea visible al presionar la papelera */}
+                    {groupToDelete?.id === group.id && (
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          padding: '0.75rem 1rem',
+                          background: 'rgba(225, 29, 72, 0.18)',
+                          border: '1px solid rgba(225, 29, 72, 0.5)',
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <span style={{ fontSize: '0.86rem', color: '#fca5a5', fontWeight: 600 }}>
+                          ⚠️ ¿Eliminar permanentemente "{group.title}"?
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.45rem' }}>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ background: '#e11d48', borderColor: '#be123c', padding: '0.35rem 0.8rem', fontSize: '0.8rem' }}
+                            onClick={() => handleConfirmDelete(group.id, group.title)}
+                          >
+                            <Trash2 size={13} />
+                            <span>Sí, eliminar</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.35rem 0.7rem', fontSize: '0.8rem' }}
+                            onClick={() => setGroupToDelete(null)}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })
