@@ -321,10 +321,10 @@ Guarda este archivo en tu computador para tener respaldo permanente.
             className="btn btn-danger-outline"
             onClick={deleteGroupWithPin}
             style={{ padding: '0.6rem 1rem' }}
-            title="Eliminar este grupo y reiniciar con PIN 471414"
+            title="Eliminar este grupo y reiniciar"
           >
             <Lock size={15} />
-            <span>Borrar Grupo (PIN: 471414)</span>
+            <span>Borrar Grupo</span>
           </button>
         </div>
 

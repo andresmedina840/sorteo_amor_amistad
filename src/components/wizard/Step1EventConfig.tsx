@@ -207,10 +207,10 @@ export const Step1EventConfig: React.FC = () => {
           className="btn btn-danger-outline"
           style={{ padding: '0.65rem 1.1rem', fontSize: '0.88rem' }}
           onClick={deleteGroupWithPin}
-          title="Borrar grupo y reiniciar todo (requiere PIN 471414)"
+          title="Borrar grupo y reiniciar todo"
         >
           <Lock size={15} />
-          <span>Borrar Grupo (PIN: 471414)</span>
+          <span>Borrar Grupo</span>
         </button>
 
         <button

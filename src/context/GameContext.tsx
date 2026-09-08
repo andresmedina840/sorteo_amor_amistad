@@ -69,16 +69,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [participants, setParticipants] = useState<Participant[]>(() => {
     const saved = LocalStorageAdapter.loadState();
     if (saved.participants && saved.participants.length > 0) {
+      // Si contenía los datos de demostración de prueba inicial, iniciamos limpio en 0
+      const isDemo = saved.participants.some(p => p.name === 'Carlos Gómez' && p.id === 'p_1');
+      if (isDemo) {
+        return [];
+      }
       return saved.participants;
     }
-    // Participantes de demostración con identificadores fijos
-    const p1 = new Participant({ id: 'p_1', name: 'Carlos Gómez', phone: '+573001234567', giftWish: 'Chocolates amargos y café especial', excludedParticipantIds: ['p_2'] });
-    const p2 = new Participant({ id: 'p_2', name: 'Laura Gómez', phone: '+573109876543', giftWish: 'Velas aromáticas o plantas', excludedParticipantIds: ['p_1'] });
-    const p3 = new Participant({ id: 'p_3', name: 'Andrés Restrepo', phone: '+573205551122', giftWish: 'Audífonos o termo para agua', excludedParticipantIds: ['p_4'] });
-    const p4 = new Participant({ id: 'p_4', name: 'Sofía Restrepo', phone: '+573154443322', giftWish: 'Libro de novela o postres', excludedParticipantIds: ['p_3'] });
-    const p5 = new Participant({ id: 'p_5', name: 'Mariana Pérez', phone: '+573017778899', giftWish: 'Bono de tienda favorita' });
-
-    return [p1, p2, p3, p4, p5];
+    return [];
   });
 
   const [pairs, setPairs] = useState<DrawPair[] | null>(() => {

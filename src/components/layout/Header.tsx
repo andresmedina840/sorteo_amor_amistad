@@ -55,10 +55,10 @@ export const Header: React.FC = () => {
             className="btn btn-secondary"
             style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
             onClick={deleteGroupWithPin}
-            title="Borrar grupo y reiniciar todo (requiere PIN 471414)"
+            title="Borrar grupo y reiniciar todo"
           >
             <RotateCcw size={14} />
-            <span>Borrar Grupo (PIN: 471414)</span>
+            <span>Borrar Grupo</span>
           </button>
         )}
       </nav>
