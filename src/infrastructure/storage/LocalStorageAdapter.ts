@@ -283,4 +283,71 @@ export class LocalStorageAdapter {
       pairs: null,
     };
   }
+
+  /**
+   * Carga el estado activo para compatibilidad con GameContext
+   */
+  public static loadState(): {
+    eventConfig: EventConfig | null;
+    participants: Participant[];
+    pairs: DrawPair[] | null;
+  } {
+    try {
+      const activeId = this.getActiveGroupId();
+      if (activeId) {
+        const loaded = this.loadGroup(activeId);
+        if (loaded) {
+          return {
+            eventConfig: loaded.eventConfig,
+            participants: loaded.participants,
+            pairs: loaded.pairs,
+          };
+        }
+      }
+
+      const groups = this.getAllGroups();
+      if (groups.length > 0) {
+        const first = this.loadGroup(groups[0].id);
+        if (first) {
+          this.setActiveGroupId(groups[0].id);
+          return {
+            eventConfig: first.eventConfig,
+            participants: first.participants,
+            pairs: first.pairs,
+          };
+        }
+      }
+
+      return { eventConfig: null, participants: [], pairs: null };
+    } catch (e) {
+      console.warn('Error al cargar estado desde LocalStorage:', e);
+      return { eventConfig: null, participants: [], pairs: null };
+    }
+  }
+
+  /**
+   * Guarda el estado del grupo actual para compatibilidad con GameContext
+   */
+  public static saveState(
+    eventConfig: EventConfig,
+    participants: Participant[],
+    pairs: DrawPair[] | null,
+    step = 1
+  ): void {
+    this.saveGroup(eventConfig, participants, pairs, step);
+  }
+
+  /**
+   * Limpia el almacenamiento de grupos y estados anteriores
+   */
+  public static clearState(): void {
+    try {
+      localStorage.removeItem(GROUPS_STORAGE_KEY);
+      localStorage.removeItem(ACTIVE_GROUP_ID_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    } catch (e) {
+      console.warn('No se pudo limpiar LocalStorage:', e);
+    }
+  }
 }
+
