@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Gift, Calendar, DollarSign, UserCheck, ArrowLeft, CheckCircle2, AlertCircle, Sparkles, Loader2, Phone, User } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { RegistrationSyncService } from '../../infrastructure/services/RegistrationSyncService';
+import { RegistrationSyncService, RegistrationInvitePayload } from '../../infrastructure/services/RegistrationSyncService';
 import { formatColombiaDateTime } from '../../core/domain/utils/dateFormatters';
 import { validateColombiaPhone, formatColombiaPhone } from '../../core/domain/utils/phoneUtils';
 import { showSuccessAlert, showToast } from '../../core/domain/utils/alertUtils';
@@ -16,7 +16,38 @@ interface PlayerRegistrationPageProps {
 export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ inviteToken, onGoHome }) => {
   const { addParticipant } = useGame();
   const syncService = useMemo(() => new RegistrationSyncService(), []);
-  const eventDetails = useMemo(() => syncService.decodeInvite(inviteToken), [inviteToken, syncService]);
+
+  // Estado para carga asíncrona de datos del evento
+  const [eventDetails, setEventDetails] = useState<RegistrationInvitePayload | null>(null);
+  const [isLoadingEvent, setIsLoadingEvent] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  // Cargar datos del evento: formato nuevo (cloudRoomId corto) o legacy (Base64)
+  useEffect(() => {
+    const loadEventData = async () => {
+      setIsLoadingEvent(true);
+      setLoadError(false);
+
+      // Intentar formato legacy (Base64) primero
+      const legacyData = syncService.decodeInvite(inviteToken);
+      if (legacyData) {
+        setEventDetails(legacyData);
+        setIsLoadingEvent(false);
+        return;
+      }
+
+      // Formato nuevo: el token es un cloudRoomId directo → cargar desde la nube
+      const cloudData = await syncService.fetchEventFromCloud(inviteToken);
+      if (cloudData) {
+        setEventDetails(cloudData);
+      } else {
+        setLoadError(true);
+      }
+      setIsLoadingEvent(false);
+    };
+
+    loadEventData();
+  }, [inviteToken, syncService]);
 
   // Nombres y Apellidos separados (Todo en Mayúsculas)
   const [firstName, setFirstName] = useState('');
@@ -32,7 +63,20 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
 
-  if (!eventDetails) {
+  // Estado de carga: spinner elegante
+  if (isLoadingEvent) {
+    return (
+      <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 2rem' }}>
+        <Loader2 size={48} className="spin-animation" style={{ color: '#fb7185', margin: '0 auto 1rem', display: 'block' }} />
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Cargando invitación...</h2>
+        <p style={{ color: 'var(--text-secondary)' }}>
+          Obteniendo los datos del sorteo. Esto tomará solo un instante.
+        </p>
+      </div>
+    );
+  }
+
+  if (loadError || !eventDetails) {
     return (
       <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 2rem' }}>
         <AlertCircle size={48} color="#f87171" style={{ margin: '0 auto 1rem' }} />

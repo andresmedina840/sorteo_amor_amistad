@@ -2,7 +2,7 @@ import { EventConfig, type CurrencyCode } from '../../core/domain/entities/Event
 import { Participant } from '../../core/domain/entities/Participant';
 import { DrawPair } from '../../core/domain/entities/DrawPair';
 
-interface SavedParticipant {
+export interface SavedParticipant {
   id: string;
   name: string;
   phone: string;
@@ -11,32 +11,106 @@ interface SavedParticipant {
   excludedParticipantIds?: string[];
 }
 
-interface SavedState {
-  eventConfig: {
-    id: string;
-    title: string;
-    maxBudget: number;
-    currency: CurrencyCode;
-    deliveryDateIso: string;
-    notes: string;
-  };
+export interface SavedEventConfig {
+  id: string;
+  title: string;
+  maxBudget: number;
+  currency: CurrencyCode;
+  deliveryDateIso: string;
+  notes: string;
+}
+
+export interface SavedGroupState {
+  id: string;
+  eventConfig: SavedEventConfig;
   participants: SavedParticipant[];
   pairs: Array<{
     giverId: string;
     receiverId: string;
   }> | null;
+  step?: number;
+  updatedAt: number;
 }
 
-const STORAGE_KEY = 'AMOR_AMISTAD_APP_STATE_V1';
+export interface GroupSummary {
+  id: string;
+  title: string;
+  maxBudget: number;
+  deliveryDateIso: string;
+  participantsCount: number;
+  hasDrawn: boolean;
+  updatedAt: number;
+}
+
+const GROUPS_STORAGE_KEY = 'AMOR_AMISTAD_GROUPS_V2';
+const ACTIVE_GROUP_ID_KEY = 'AMOR_AMISTAD_ACTIVE_GROUP_ID';
+const LEGACY_STORAGE_KEY = 'AMOR_AMISTAD_APP_STATE_V1';
 
 export class LocalStorageAdapter {
-  public static saveState(
+  /**
+   * Carga todos los grupos guardados en el almacenamiento local
+   */
+  public static getAllGroups(): SavedGroupState[] {
+    try {
+      const raw = localStorage.getItem(GROUPS_STORAGE_KEY);
+      if (raw) {
+        return JSON.parse(raw) as SavedGroupState[];
+      }
+
+      // Migración transparente desde V1 si existe
+      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacyRaw) {
+        const legacyParsed = JSON.parse(legacyRaw);
+        if (legacyParsed && legacyParsed.eventConfig) {
+          const migratedGroup: SavedGroupState = {
+            id: legacyParsed.eventConfig.id || 'group_default',
+            eventConfig: legacyParsed.eventConfig,
+            participants: legacyParsed.participants || [],
+            pairs: legacyParsed.pairs || null,
+            updatedAt: Date.now(),
+          };
+          const list = [migratedGroup];
+          localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(list));
+          localStorage.setItem(ACTIVE_GROUP_ID_KEY, migratedGroup.id);
+          return list;
+        }
+      }
+      return [];
+    } catch (e) {
+      console.warn('Error al cargar grupos:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Obtiene la lista de resúmenes de grupos para el selector rápido
+   */
+  public static getGroupsSummary(): GroupSummary[] {
+    const groups = this.getAllGroups();
+    return groups.map(g => ({
+      id: g.id,
+      title: g.eventConfig.title || 'Grupo sin título',
+      maxBudget: g.eventConfig.maxBudget || 60000,
+      deliveryDateIso: g.eventConfig.deliveryDateIso,
+      participantsCount: g.participants?.length || 0,
+      hasDrawn: Boolean(g.pairs && g.pairs.length > 0),
+      updatedAt: g.updatedAt || Date.now(),
+    }));
+  }
+
+  /**
+   * Guarda o actualiza un grupo específico
+   */
+  public static saveGroup(
     eventConfig: EventConfig,
     participants: Participant[],
-    pairs: DrawPair[] | null
+    pairs: DrawPair[] | null,
+    step = 1
   ): void {
     try {
-      const state: SavedState = {
+      const groups = this.getAllGroups();
+      const groupState: SavedGroupState = {
+        id: eventConfig.id,
         eventConfig: {
           id: eventConfig.id,
           title: eventConfig.title,
@@ -59,37 +133,48 @@ export class LocalStorageAdapter {
               receiverId: pair.receiver.id,
             }))
           : null,
+        step,
+        updatedAt: Date.now(),
       };
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const index = groups.findIndex(g => g.id === eventConfig.id);
+      if (index >= 0) {
+        groups[index] = groupState;
+      } else {
+        groups.push(groupState);
+      }
+
+      localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+      localStorage.setItem(ACTIVE_GROUP_ID_KEY, eventConfig.id);
     } catch (e) {
-      console.warn('No se pudo guardar el estado en LocalStorage:', e);
+      console.warn('Error al guardar grupo:', e);
     }
   }
 
-  public static loadState(): {
-    eventConfig: EventConfig | null;
+  /**
+   * Carga un grupo específico por su ID
+   */
+  public static loadGroup(groupId: string): {
+    eventConfig: EventConfig;
     participants: Participant[];
     pairs: DrawPair[] | null;
-  } {
+    step: number;
+  } | null {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return { eventConfig: null, participants: [], pairs: null };
-      }
-
-      const parsed: SavedState = JSON.parse(raw);
+      const groups = this.getAllGroups();
+      const found = groups.find(g => g.id === groupId);
+      if (!found) return null;
 
       const eventConfig = new EventConfig({
-        id: parsed.eventConfig.id,
-        title: parsed.eventConfig.title,
-        maxBudget: parsed.eventConfig.maxBudget,
-        currency: parsed.eventConfig.currency,
-        deliveryDateIso: parsed.eventConfig.deliveryDateIso,
-        notes: parsed.eventConfig.notes,
+        id: found.eventConfig.id,
+        title: found.eventConfig.title,
+        maxBudget: found.eventConfig.maxBudget,
+        currency: found.eventConfig.currency,
+        deliveryDateIso: found.eventConfig.deliveryDateIso,
+        notes: found.eventConfig.notes,
       });
 
-      const participants = parsed.participants.map(
+      const participants = found.participants.map(
         p => new Participant({
           id: p.id,
           name: p.name,
@@ -101,9 +186,9 @@ export class LocalStorageAdapter {
       );
 
       let pairs: DrawPair[] | null = null;
-      if (parsed.pairs && parsed.pairs.length > 0) {
+      if (found.pairs && found.pairs.length > 0) {
         const participantMap = new Map(participants.map(p => [p.id, p]));
-        pairs = parsed.pairs
+        pairs = found.pairs
           .map(pairItem => {
             const giver = participantMap.get(pairItem.giverId);
             const receiver = participantMap.get(pairItem.receiverId);
@@ -115,18 +200,87 @@ export class LocalStorageAdapter {
           .filter((p): p is DrawPair => p !== null);
       }
 
-      return { eventConfig, participants, pairs };
+      return {
+        eventConfig,
+        participants,
+        pairs,
+        step: found.step || (pairs && pairs.length > 0 ? 4 : participants.length > 0 ? 2 : 1),
+      };
     } catch (e) {
-      console.warn('Error al cargar estado desde LocalStorage:', e);
-      return { eventConfig: null, participants: [], pairs: null };
+      console.warn('Error al cargar grupo específico:', e);
+      return null;
     }
   }
 
-  public static clearState(): void {
+  /**
+   * Obtiene el ID del grupo actualmente activo
+   */
+  public static getActiveGroupId(): string | null {
     try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {
-      console.warn('No se pudo limpiar LocalStorage:', e);
+      return localStorage.getItem(ACTIVE_GROUP_ID_KEY);
+    } catch {
+      return null;
     }
+  }
+
+  /**
+   * Establece el ID del grupo activo
+   */
+  public static setActiveGroupId(groupId: string): void {
+    try {
+      localStorage.setItem(ACTIVE_GROUP_ID_KEY, groupId);
+    } catch {}
+  }
+
+  /**
+   * Elimina un grupo específico
+   */
+  public static deleteGroup(groupId: string): void {
+    try {
+      const groups = this.getAllGroups().filter(g => g.id !== groupId);
+      localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+
+      const activeId = this.getActiveGroupId();
+      if (activeId === groupId) {
+        if (groups.length > 0) {
+          localStorage.setItem(ACTIVE_GROUP_ID_KEY, groups[0].id);
+        } else {
+          localStorage.removeItem(ACTIVE_GROUP_ID_KEY);
+        }
+      }
+    } catch (e) {
+      console.warn('Error al eliminar grupo:', e);
+    }
+  }
+
+  /**
+   * Crea un nuevo grupo limpio
+   */
+  public static createNewGroup(title?: string): {
+    eventConfig: EventConfig;
+    participants: Participant[];
+    pairs: DrawPair[] | null;
+  } {
+    const defaultDeliveryDate = new Date();
+    defaultDeliveryDate.setDate(defaultDeliveryDate.getDate() + 14);
+    defaultDeliveryDate.setHours(19, 0, 0, 0);
+
+    const newConfig = new EventConfig({
+      id: 'grp_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      title: title || 'Amor y Amistad 2026',
+      maxBudget: 60000,
+      currency: 'COP',
+      deliveryDateIso: defaultDeliveryDate.toISOString(),
+      notes: 'Entrega de regalos y compartir especial.',
+    });
+
+    this.saveGroup(newConfig, [], null, 1);
+    this.setActiveGroupId(newConfig.id);
+
+    return {
+      eventConfig: newConfig,
+      participants: [],
+      pairs: null,
+    };
   }
 }

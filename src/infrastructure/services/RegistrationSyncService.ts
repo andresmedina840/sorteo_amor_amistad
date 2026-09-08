@@ -23,6 +23,10 @@ export interface PlayerRegistrationData {
 interface CloudRoomData {
   eventId: string;
   title: string;
+  maxBudget?: number;
+  currency?: string;
+  deliveryDateIso?: string;
+  notes?: string;
   players: PlayerRegistrationData[];
 }
 
@@ -41,7 +45,8 @@ const ROOM_STORAGE_PREFIX = 'AMOR_AMISTAD_ROOM_';
  */
 export class RegistrationSyncService {
   /**
-   * Crea o recupera una sala en la nube para el evento
+   * Crea o recupera una sala en la nube para el evento.
+   * Almacena TODOS los datos del evento para que la URL de registro sea ultra-corta.
    */
   public async createOrGetRoom(eventConfig: EventConfig): Promise<string> {
     const storageKey = `${ROOM_STORAGE_PREFIX}${eventConfig.id}`;
@@ -51,6 +56,23 @@ export class RegistrationSyncService {
       try {
         const verifyRes = await fetch(`${CLOUD_API_URL}/${cachedRoomId}`);
         if (verifyRes.ok) {
+          // Actualizar los datos del evento en la nube (por si cambiaron)
+          const existing: CloudObjectResponse = await verifyRes.json();
+          await fetch(`${CLOUD_API_URL}/${cachedRoomId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: existing.name,
+              data: {
+                ...existing.data,
+                title: eventConfig.title,
+                maxBudget: eventConfig.maxBudget,
+                currency: eventConfig.currency,
+                deliveryDateIso: eventConfig.deliveryDateIso,
+                notes: eventConfig.notes,
+              },
+            }),
+          }).catch(() => {});
           return cachedRoomId;
         }
       } catch (err) {
@@ -58,7 +80,7 @@ export class RegistrationSyncService {
       }
     }
 
-    // Crear nueva sala en la nube
+    // Crear nueva sala en la nube con TODOS los datos del evento
     try {
       const response = await fetch(CLOUD_API_URL, {
         method: 'POST',
@@ -68,6 +90,10 @@ export class RegistrationSyncService {
           data: {
             eventId: eventConfig.id,
             title: eventConfig.title,
+            maxBudget: eventConfig.maxBudget,
+            currency: eventConfig.currency,
+            deliveryDateIso: eventConfig.deliveryDateIso,
+            notes: eventConfig.notes,
             players: [],
           },
         }),
@@ -90,29 +116,47 @@ export class RegistrationSyncService {
   }
 
   /**
-   * Genera el enlace de invitación para que los jugadores se registren
+   * Genera el enlace de invitación ULTRA-CORTO usando solo el cloudRoomId.
+   * Ejemplo: https://andresmedina840.github.io/sorteo_amor_amistad/#registro=abc123
    */
   public async generateInviteLink(eventConfig: EventConfig, baseUrl: string): Promise<string> {
     const cloudRoomId = await this.createOrGetRoom(eventConfig);
-
-    const invitePayload: RegistrationInvitePayload = {
-      eventId: eventConfig.id,
-      cloudRoomId,
-      eventTitle: eventConfig.title,
-      maxBudget: eventConfig.maxBudget,
-      currency: eventConfig.currency,
-      deliveryDateIso: eventConfig.deliveryDateIso,
-      notes: eventConfig.notes,
-    };
-
-    const json = JSON.stringify(invitePayload);
-    const encoded = btoa(encodeURIComponent(json));
     const cleanBaseUrl = baseUrl.split('#')[0].split('?')[0];
-    return `${cleanBaseUrl}#registro=${encoded}`;
+    return `${cleanBaseUrl}#registro=${cloudRoomId}`;
   }
 
   /**
-   * Decodifica la invitación que abre el jugador en su celular
+   * Obtiene los datos completos del evento desde la nube usando el cloudRoomId.
+   * Este método reemplaza decodeInvite para URLs cortas.
+   */
+  public async fetchEventFromCloud(cloudRoomId: string): Promise<RegistrationInvitePayload | null> {
+    if (!cloudRoomId) return null;
+
+    try {
+      const response = await fetch(`${CLOUD_API_URL}/${cloudRoomId}`);
+      if (!response.ok) return null;
+
+      const data: CloudObjectResponse = await response.json();
+      if (!data.data?.eventId) return null;
+
+      return {
+        eventId: data.data.eventId,
+        cloudRoomId,
+        eventTitle: data.data.title || 'Sorteo de Amor y Amistad',
+        maxBudget: data.data.maxBudget || 50000,
+        currency: data.data.currency || 'COP',
+        deliveryDateIso: data.data.deliveryDateIso || new Date().toISOString(),
+        notes: data.data.notes || '',
+      };
+    } catch (err) {
+      console.warn('Error al obtener datos del evento desde la nube:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Decodifica la invitación - soporta formato legacy (Base64) y formato nuevo (cloudRoomId directo).
+   * Si el token parece ser Base64, lo decodifica. Si no, lo trata como cloudRoomId.
    */
   public decodeInvite(token: string): RegistrationInvitePayload | null {
     try {
@@ -121,6 +165,25 @@ export class RegistrationSyncService {
       return JSON.parse(json) as RegistrationInvitePayload;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Determina si un token de registro es un cloudRoomId directo (URL corta)
+   * o un payload Base64 legacy (URL larga).
+   */
+  public isCloudRoomId(token: string): boolean {
+    if (!token) return false;
+    // Los cloudRoomId de restful-api.dev son alfanuméricos cortos (ej: "ff80818...")
+    // Los payloads Base64 siempre contienen caracteres como '=' o son mucho más largos
+    try {
+      const decoded = decodeURIComponent(atob(token));
+      JSON.parse(decoded);
+      // Si logra parsearse como JSON, es formato legacy Base64
+      return false;
+    } catch {
+      // Si falla el parseo, es un cloudRoomId directo
+      return true;
     }
   }
 
