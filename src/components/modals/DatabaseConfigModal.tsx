@@ -65,11 +65,15 @@ CREATE TABLE IF NOT EXISTS sorteo_participants (
   group_id TEXT NOT NULL REFERENCES sorteo_groups(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   phone TEXT DEFAULT '',
+  pin TEXT DEFAULT '',
   gift_wish TEXT DEFAULT '',
   family_id TEXT DEFAULT NULL,
   excluded_participant_ids TEXT[] DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Asegurar columna pin si la tabla ya existía
+ALTER TABLE sorteo_participants ADD COLUMN IF NOT EXISTS pin TEXT DEFAULT '';
 
 ALTER TABLE sorteo_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sorteo_participants ENABLE ROW LEVEL SECURITY;
