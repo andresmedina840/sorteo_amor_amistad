@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Sparkles, DollarSign, Calendar, Gift, CheckCircle2, Lock, ArrowLeft } from 'lucide-react';
+import { Heart, Sparkles, DollarSign, Calendar, Gift, CheckCircle2, Lock, ArrowLeft, Key, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WebCryptoService } from '../../infrastructure/services/WebCryptoService';
 import type { SecretRevealPayload } from '../../core/domain/services/ICryptoService';
@@ -16,6 +16,16 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
   const cryptoService = useMemo(() => new WebCryptoService(), []);
   const [payload, setPayload] = useState<SecretRevealPayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Estado de verificación por PIN
+  const [pinVerified, setPinVerified] = useState(false);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [pinError, setPinError] = useState('');
+  const [pinAttempts, setPinAttempts] = useState(0);
+  const MAX_PIN_ATTEMPTS = 5;
+
+  // Estado de revelación (sobre abierto)
   const [isRevealed, setIsRevealed] = useState(false);
   const [countdown, setCountdown] = useState<{ days: number; hours: number; minutes: number; seconds: number; isPast: boolean }>({
     days: 0,
@@ -32,6 +42,10 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
       if (isMounted) {
         setPayload(decoded);
         setIsLoading(false);
+        // Si el participante no tiene PIN configurado, saltar verificación
+        if (decoded && (!decoded.giverPin || decoded.giverPin.trim() === '')) {
+          setPinVerified(true);
+        }
       }
     });
     return () => {
@@ -50,6 +64,45 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [payload?.deliveryDateIso]);
+
+  // Verificar el PIN ingresado
+  const handleVerifyPin = () => {
+    if (!payload) return;
+
+    if (pinAttempts >= MAX_PIN_ATTEMPTS) {
+      setPinError(`Has superado el máximo de ${MAX_PIN_ATTEMPTS} intentos. Solicita ayuda al organizador.`);
+      return;
+    }
+
+    const trimmedPin = enteredPin.trim();
+    if (!trimmedPin) {
+      setPinError('Por favor ingresa tu PIN de 4 dígitos');
+      return;
+    }
+
+    if (trimmedPin === payload.giverPin) {
+      setPinVerified(true);
+      setPinError('');
+      showToast('✅ PIN verificado correctamente', 'success');
+    } else {
+      const newAttempts = pinAttempts + 1;
+      setPinAttempts(newAttempts);
+      const remaining = MAX_PIN_ATTEMPTS - newAttempts;
+      setPinError(
+        remaining > 0
+          ? `PIN incorrecto. Te quedan ${remaining} intento${remaining === 1 ? '' : 's'}.`
+          : `Has superado el máximo de ${MAX_PIN_ATTEMPTS} intentos. Solicita ayuda al organizador.`
+      );
+      setEnteredPin('');
+    }
+  };
+
+  // Manejar Enter en campo de PIN
+  const handlePinKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleVerifyPin();
+    }
+  };
 
   const handleOpenEnvelope = () => {
     if (isRevealed) return;
@@ -83,6 +136,7 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
     showToast('¡Sobre abierto! Guarda bien este secreto 🤫', 'success');
   };
 
+  // --- PANTALLA DE CARGA ---
   if (isLoading) {
     return (
       <div className="glass-panel" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
@@ -99,6 +153,7 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
     );
   }
 
+  // --- ENLACE INVÁLIDO ---
   if (!payload) {
     return (
       <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 2rem' }}>
@@ -117,6 +172,182 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
     );
   }
 
+  // --- PANTALLA DE VERIFICACIÓN DE PIN ---
+  if (!pinVerified) {
+    const isBlocked = pinAttempts >= MAX_PIN_ATTEMPTS;
+
+    return (
+      <motion.div
+        className="glass-panel"
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.35 }}
+        style={{ maxWidth: '520px', margin: '0 auto' }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+          <div className="brand-badge">
+            <Heart size={13} fill="#e11d48" color="#e11d48" />
+            <span>Sorteo Oficial de Amor y Amistad</span>
+          </div>
+          <h1 style={{ fontSize: '1.8rem', marginTop: '0.25rem' }}>{payload.eventTitle}</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '0.5rem' }}>
+            ¡Hola, <strong style={{ color: '#fb7185' }}>{payload.giverName}</strong>! Para proteger tu secreto, necesitamos verificar tu identidad.
+          </p>
+        </div>
+
+        {/* Icono de seguridad */}
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <motion.div
+            animate={{ scale: [1, 1.08, 1] }}
+            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+            style={{
+              display: 'inline-flex',
+              padding: '1.25rem',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(225,29,72,0.15))',
+              border: '2px solid rgba(251,191,36,0.3)',
+            }}
+          >
+            <ShieldCheck size={48} color="#fbbf24" />
+          </motion.div>
+        </div>
+
+        {/* Campo de PIN */}
+        <div style={{ maxWidth: '320px', margin: '0 auto' }}>
+          <label
+            htmlFor="pin-input"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              marginBottom: '0.5rem',
+            }}
+          >
+            <Key size={15} color="#fbbf24" />
+            <span>Ingresa tu PIN de 4 dígitos</span>
+          </label>
+
+          <div style={{ position: 'relative' }}>
+            <input
+              id="pin-input"
+              type={showPin ? 'text' : 'password'}
+              inputMode="numeric"
+              maxLength={4}
+              value={enteredPin}
+              onChange={e => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setEnteredPin(val);
+                setPinError('');
+              }}
+              onKeyDown={handlePinKeyDown}
+              disabled={isBlocked}
+              placeholder="••••"
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '0.85rem 3rem 0.85rem 1rem',
+                fontSize: '1.6rem',
+                letterSpacing: '0.6em',
+                textAlign: 'center',
+                background: 'rgba(13, 8, 22, 0.8)',
+                border: pinError ? '2px solid #f87171' : '2px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                fontFamily: 'monospace',
+                transition: 'border-color 0.2s',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPin(!showPin)}
+              style={{
+                position: 'absolute',
+                right: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '0.25rem',
+              }}
+              tabIndex={-1}
+            >
+              {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
+          {/* Mensaje de error */}
+          <AnimatePresence>
+            {pinError && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  marginTop: '0.6rem',
+                  fontSize: '0.82rem',
+                  color: '#f87171',
+                  background: 'rgba(248,113,113,0.08)',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '6px',
+                }}
+              >
+                <AlertCircle size={14} />
+                <span>{pinError}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Botón verificar */}
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleVerifyPin}
+            disabled={isBlocked || enteredPin.length < 4}
+            style={{
+              width: '100%',
+              marginTop: '1.25rem',
+              padding: '0.85rem',
+              fontSize: '1rem',
+              fontWeight: 700,
+              gap: '0.5rem',
+              opacity: isBlocked || enteredPin.length < 4 ? 0.5 : 1,
+            }}
+          >
+            <Lock size={16} />
+            <span>Verificar PIN y Abrir Sobre</span>
+          </button>
+
+          <p style={{
+            textAlign: 'center',
+            fontSize: '0.78rem',
+            color: 'var(--text-muted)',
+            marginTop: '1rem',
+            lineHeight: 1.5,
+          }}>
+            Este es el PIN de 4 dígitos que ingresaste al registrarte en el sorteo. Si no lo recuerdas, contacta al organizador del evento.
+          </p>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+          <button type="button" className="btn btn-secondary" onClick={onGoHome} style={{ fontSize: '0.85rem' }}>
+            <ArrowLeft size={15} />
+            <span>Ir a la página principal</span>
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // --- PANTALLA DE REVELACIÓN (PIN YA VERIFICADO) ---
   return (
     <motion.div
       className="glass-panel"

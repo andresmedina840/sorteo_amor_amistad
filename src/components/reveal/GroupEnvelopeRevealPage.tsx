@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Gift, Lock, Key, AlertCircle, Eye, EyeOff, Sparkles, ArrowLeft, RefreshCw, Calendar, DollarSign, Heart, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useGame } from '../../context/GameContext';
-import { LocalStorageAdapter } from '../../infrastructure/storage/LocalStorageAdapter';
+
 import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService';
 import { isSupabaseConfigured } from '../../infrastructure/storage/supabaseClient';
 import { formatColombiaDateTime } from '../../core/domain/utils/dateFormatters';
@@ -49,32 +49,13 @@ export const GroupEnvelopeRevealPage: React.FC<GroupEnvelopeRevealPageProps> = (
       // 2. Intentar cargar desde Supabase
       if (isSupabaseConfigured() && targetId) {
         const cloudGroup = await SupabaseStorageService.loadGroup(targetId);
-        if (cloudGroup && cloudGroup.pairs) {
+        if (cloudGroup) {
           setActiveEventConfig(cloudGroup.eventConfig);
           setParticipantsList(cloudGroup.participants);
           setPairsList(cloudGroup.pairs);
           setIsLoading(false);
           return;
         }
-      }
-
-      // 3. Cargar desde LocalStorage
-      if (targetId) {
-        const localGroup = LocalStorageAdapter.loadGroup(targetId);
-        if (localGroup) {
-          setActiveEventConfig(localGroup.eventConfig);
-          setParticipantsList(localGroup.participants);
-          setPairsList(localGroup.pairs);
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      const activeLoaded = LocalStorageAdapter.loadState();
-      if (activeLoaded.eventConfig) {
-        setActiveEventConfig(activeLoaded.eventConfig);
-        setParticipantsList(activeLoaded.participants);
-        setPairsList(activeLoaded.pairs);
       }
 
       setIsLoading(false);

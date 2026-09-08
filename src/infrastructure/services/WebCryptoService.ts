@@ -1,4 +1,4 @@
-import type { ICryptoService, SecretRevealPayload } from '../../core/domain/services/ICryptoService';
+import type { ICryptoService, SecretRevealPayload, GroupRevealPayload } from '../../core/domain/services/ICryptoService';
 
 /**
  * Implementación de ICryptoService usando codificación URL segura,
@@ -9,11 +9,11 @@ export class WebCryptoService implements ICryptoService {
   private readonly APP_SALT = 'AMOR_Y_AMISTAD_COLOMBIA_2026_SECRET_SALT';
 
   /**
-   * Codifica el payload en un token seguro para URLs
+   * Método interno para codificar cualquier objeto JSON en un token URL-safe
    */
-  public async encodePayload(payload: SecretRevealPayload): Promise<string> {
-    const jsonString = JSON.stringify(payload);
-    
+  private encodeToToken(data: unknown): string {
+    const jsonString = JSON.stringify(data);
+
     // Convertir string a bytes UTF-8 para soportar tildes, eñes y emojis
     const encoder = new TextEncoder();
     const dataBytes = encoder.encode(jsonString);
@@ -37,9 +37,9 @@ export class WebCryptoService implements ICryptoService {
   }
 
   /**
-   * Decodifica y reconstruye el payload original desde el token
+   * Método interno para decodificar un token URL-safe a JSON
    */
-  public async decodePayload(token: string): Promise<SecretRevealPayload | null> {
+  private decodeFromToken(token: string): unknown | null {
     try {
       if (!token || typeof token !== 'string') return null;
 
@@ -65,17 +65,46 @@ export class WebCryptoService implements ICryptoService {
 
       const decoder = new TextDecoder('utf-8');
       const jsonString = decoder.decode(originalBytes);
-      const parsed = JSON.parse(jsonString) as SecretRevealPayload;
-
-      // Validar estructura básica
-      if (!parsed.eventTitle || !parsed.giverName || !parsed.receiverName) {
-        return null;
-      }
-
-      return parsed;
+      return JSON.parse(jsonString);
     } catch (error) {
-      console.error('Error al decodificar token de sorteo:', error);
+      console.error('Error al decodificar token:', error);
       return null;
     }
+  }
+
+  /**
+   * Codifica el payload individual en un token seguro para URLs
+   */
+  public async encodePayload(payload: SecretRevealPayload): Promise<string> {
+    return this.encodeToToken(payload);
+  }
+
+  /**
+   * Decodifica y reconstruye el payload individual desde el token
+   */
+  public async decodePayload(token: string): Promise<SecretRevealPayload | null> {
+    const parsed = this.decodeFromToken(token) as SecretRevealPayload | null;
+    if (!parsed || !parsed.eventTitle || !parsed.giverName || !parsed.receiverName) {
+      return null;
+    }
+    return parsed;
+  }
+
+  /**
+   * Codifica el payload GRUPAL (un solo enlace para todo el sorteo)
+   */
+  public async encodeGroupPayload(payload: GroupRevealPayload): Promise<string> {
+    return this.encodeToToken(payload);
+  }
+
+  /**
+   * Decodifica el payload grupal desde el token
+   */
+  public async decodeGroupPayload(token: string): Promise<GroupRevealPayload | null> {
+    const parsed = this.decodeFromToken(token) as GroupRevealPayload | null;
+    if (!parsed || !parsed.eventTitle || !Array.isArray(parsed.entries)) {
+      return null;
+    }
+    return parsed;
   }
 }

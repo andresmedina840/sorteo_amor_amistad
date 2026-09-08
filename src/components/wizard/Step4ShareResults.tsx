@@ -7,7 +7,7 @@ import { formatColombiaDateTime } from '../../core/domain/utils/dateFormatters';
 import { showToast, showConfirmDialog, showSuccessAlert } from '../../core/domain/utils/alertUtils';
 
 export const Step4ShareResults: React.FC = () => {
-  const { eventConfig, pairs, shareableItems, resetDraw, deleteGroupWithPin } = useGame();
+  const { eventConfig, pairs, shareableItems, groupShareResult, resetDraw, deleteGroupWithPin } = useGame();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopyLink = async (item: ShareableItem) => {
@@ -180,7 +180,7 @@ Guarda este archivo en tu computador para tener respaldo permanente.
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#86efac', fontSize: '0.9rem', fontWeight: 600 }}>
           <CheckCircle2 size={18} />
-          <span>💾 Sorteo guardado automáticamente en tu navegador</span>
+          <span>💾 Sorteo guardado automáticamente en la base de datos</span>
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -245,103 +245,86 @@ Guarda este archivo en tu computador para tener respaldo permanente.
       </div>
 
       {/* ========================================================================= */}
-      {/* ENLACE GENERAL DE SOBRES CON PIN (PARA TODO EL GRUPO O SIN CELULAR) */}
+      {/* ENLACE ÚNICO GRUPAL (¡UN SOLO ENLACE PARA TODOS!) */}
       {/* ========================================================================= */}
-      {(() => {
-        const baseUrl = typeof window !== 'undefined' ? window.location.href.split('#')[0].split('?')[0] : '';
-        const generalSobresUrl = `${baseUrl}#sobres=${eventConfig.id}`;
-        const whatsappMsg = 
-`💌 *¡Ya se realizó el sorteo de Amor y Amistad: ${eventConfig.title}!* 🎁✨
-
-💰 *Presupuesto:* ${eventConfig.getFormattedBudget()}
-🗓️ *Entrega:* ${eventConfig.getFormattedDeliveryDate()}
-
-👉 *Abre tu sobre digital aquí (ingresando tu PIN de 4 dígitos):*
-${generalSobresUrl}
-
-(Selecciona tu nombre y digita tu PIN secreto para ver quién te salió) 🤫`;
-
-        const whatsappGeneralUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMsg)}`;
-
-        return (
-          <div
-            style={{
-              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(225, 29, 72, 0.15) 100%)',
-              border: '2px solid rgba(251, 191, 36, 0.45)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '1.5rem',
-              marginBottom: '2.5rem',
-              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-              <Key size={22} color="#fbbf24" />
-              <h3 style={{ fontSize: '1.3rem', color: '#fff', margin: 0 }}>
-                🌟 Enlace General de Sobres con PIN (Para Todo el Grupo)
-              </h3>
-            </div>
-
-            <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-              <strong>¡La forma más fácil para todos!</strong> Comparte este único enlace con todo el grupo. Cada participante (tenga o no celular propio) entra, selecciona su nombre, digita su <strong>PIN de 4 dígitos</strong> y descubre a su amigo secreto de forma 100% privada.
-            </p>
-
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <input
-                type="text"
-                readOnly
-                value={generalSobresUrl}
-                className="form-input"
-                style={{
-                  flex: '1 1 280px',
-                  background: 'rgba(0, 0, 0, 0.45)',
-                  color: '#fbbf24',
-                  fontFamily: 'monospace',
-                  fontSize: '0.9rem',
-                }}
-                onClick={async () => {
-                  await navigator.clipboard.writeText(generalSobresUrl);
-                  showToast('¡Enlace general de sobres copiado!', 'success');
-                }}
-              />
-
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ padding: '0.75rem 1.25rem' }}
-                onClick={async () => {
-                  await navigator.clipboard.writeText(generalSobresUrl);
-                  showToast('¡Enlace copiado al portapapeles!', 'success');
-                }}
-              >
-                <Copy size={16} />
-                <span>Copiar Enlace General</span>
-              </button>
-
-              <a
-                href={whatsappGeneralUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-whatsapp"
-                style={{ padding: '0.75rem 1.35rem' }}
-              >
-                <Send size={16} />
-                <span>Enviar al Grupo por WhatsApp</span>
-              </a>
-
-              <a
-                href={generalSobresUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-secondary"
-                style={{ padding: '0.75rem 1.1rem' }}
-              >
-                <ExternalLink size={16} color="#38bdf8" />
-                <span>Abrir Pantalla de Sobres</span>
-              </a>
-            </div>
+      {groupShareResult && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(225, 29, 72, 0.15) 100%)',
+            border: '2px solid rgba(251, 191, 36, 0.45)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            marginBottom: '2.5rem',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+            <Key size={22} color="#fbbf24" />
+            <h3 style={{ fontSize: '1.3rem', color: '#fff', margin: 0 }}>
+              🌟 Enlace Único del Sorteo (Para Todo el Grupo)
+            </h3>
           </div>
-        );
-      })()}
+
+          <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+            <strong>¡La forma más fácil para todos!</strong> Comparte este único enlace con todo el grupo. Cada participante entra, selecciona su nombre, digita su <strong>PIN de 4 dígitos</strong> y descubre a su amigo secreto de forma 100% privada. <strong>Funciona desde cualquier celular sin necesidad de base de datos.</strong>
+          </p>
+
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              type="text"
+              readOnly
+              value={groupShareResult.shareUrl}
+              className="form-input"
+              style={{
+                flex: '1 1 280px',
+                background: 'rgba(0, 0, 0, 0.45)',
+                color: '#fbbf24',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+              }}
+              onClick={async () => {
+                await navigator.clipboard.writeText(groupShareResult.shareUrl);
+                showToast('¡Enlace del sorteo copiado!', 'success');
+              }}
+            />
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ padding: '0.75rem 1.25rem' }}
+              onClick={async () => {
+                await navigator.clipboard.writeText(groupShareResult.shareUrl);
+                showToast('¡Enlace copiado al portapapeles!', 'success');
+              }}
+            >
+              <Copy size={16} />
+              <span>Copiar Enlace</span>
+            </button>
+
+            <a
+              href={groupShareResult.whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-whatsapp"
+              style={{ padding: '0.75rem 1.35rem' }}
+            >
+              <Send size={16} />
+              <span>Enviar al Grupo por WhatsApp</span>
+            </a>
+
+            <a
+              href={groupShareResult.shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              style={{ padding: '0.75rem 1.1rem' }}
+            >
+              <ExternalLink size={16} color="#38bdf8" />
+              <span>Abrir Pantalla de Sobres</span>
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Lista de enlaces individuales opcionales */}
       <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -433,7 +416,7 @@ ${generalSobresUrl}
           onClick={() => {
             showSuccessAlert(
               '¡Sorteo Confidencial Guardado!',
-              'Tu sorteo está guardado en el navegador de forma 100% privada. Ningún administrador conoce los resultados.'
+              'Tu sorteo está guardado en la base de datos de forma 100% privada. Ningún administrador conoce los resultados.'
             );
           }}
         >

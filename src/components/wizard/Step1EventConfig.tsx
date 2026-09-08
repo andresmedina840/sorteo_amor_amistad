@@ -8,7 +8,7 @@ import {
   fromInputToIsoString,
 } from '../../core/domain/utils/dateFormatters';
 import { showToast } from '../../core/domain/utils/alertUtils';
-import { LocalStorageAdapter } from '../../infrastructure/storage/LocalStorageAdapter';
+
 import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService';
 import { isSupabaseConfigured } from '../../infrastructure/storage/supabaseClient';
 
@@ -21,19 +21,16 @@ export const Step1EventConfig: React.FC = () => {
     setIsSaving(true);
 
     try {
-      // Guardar en almacenamiento local
-      LocalStorageAdapter.saveGroup(eventConfig, participants, pairs, 1);
-
-      // Si Supabase está configurado, guardar en la base de datos en la nube
+      // Guardar en la base de datos Supabase
       if (isSupabaseConfigured()) {
         const ok = await SupabaseStorageService.saveGroup(eventConfig, participants, pairs, 1);
         if (ok) {
-          showToast('☁️ ¡Grupo guardado en la base de datos Supabase con éxito!', 'success');
+          showToast('☁️ ¡Grupo guardado en la base de datos con éxito!', 'success');
         } else {
-          showToast('⚠️ Guardado localmente. Revisa la conexión de Supabase.', 'warning');
+          showToast('⚠️ Error al guardar en la base de datos. Verifica la conexión.', 'warning');
         }
       } else {
-        showToast('💾 ¡Grupo guardado localmente con éxito!', 'success');
+        showToast('⚠️ Base de datos no configurada. Configura Supabase primero.', 'warning');
       }
 
       setStep(2);

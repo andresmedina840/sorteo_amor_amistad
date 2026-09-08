@@ -4,8 +4,7 @@ import { Participant } from '../core/domain/entities/Participant';
 import { DrawPair } from '../core/domain/entities/DrawPair';
 import { BacktrackingDrawEngine } from '../core/domain/services/BacktrackingDrawEngine';
 import { WebCryptoService } from '../infrastructure/services/WebCryptoService';
-import { DrawUseCases, type ShareableItem } from '../core/application/useCases/DrawUseCases';
-import { LocalStorageAdapter } from '../infrastructure/storage/LocalStorageAdapter';
+import { DrawUseCases, type ShareableItem, type GroupShareResult } from '../core/application/useCases/DrawUseCases';
 import { requestPinToDeleteGroup, showSuccessAlert } from '../core/domain/utils/alertUtils';
 
 import { SupabaseStorageService } from '../infrastructure/storage/SupabaseStorageService';
@@ -17,6 +16,7 @@ interface GameContextType {
   participants: Participant[];
   pairs: DrawPair[] | null;
   shareableItems: ShareableItem[];
+  groupShareResult: GroupShareResult | null;
   step: number;
   errorMessage: string | null;
   feasibility: { isFeasible: boolean; reason?: string };
@@ -66,50 +66,79 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const cryptoService = useMemo(() => new WebCryptoService(), []);
   const useCases = useMemo(() => new DrawUseCases(drawEngine, cryptoService), [drawEngine, cryptoService]);
 
-  // Carga inicial desde LocalStorage
-  const [eventConfig, setEventConfig] = useState<EventConfig>(() => {
-    const saved = LocalStorageAdapter.loadState();
-    return saved.eventConfig || defaultInitialConfig;
-  });
-
-  const [participants, setParticipants] = useState<Participant[]>(() => {
-    const saved = LocalStorageAdapter.loadState();
-    if (saved.participants && saved.participants.length > 0) {
-      // Si contenía los datos de demostración de prueba inicial, iniciamos limpio en 0
-      const isDemo = saved.participants.some(p => p.name === 'Carlos Gómez' && p.id === 'p_1');
-      if (isDemo) {
-        return [];
-      }
-      return saved.participants;
-    }
-    return [];
-  });
-
-  const [pairs, setPairs] = useState<DrawPair[] | null>(() => {
-    const saved = LocalStorageAdapter.loadState();
-    return saved.pairs;
-  });
-
+  // Estado inicial (valores por defecto, se sobreescribe al cargar de Supabase)
+  const [eventConfig, setEventConfig] = useState<EventConfig>(defaultInitialConfig);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [pairs, setPairs] = useState<DrawPair[] | null>(null);
   const [shareableItems, setShareableItems] = useState<ShareableItem[]>([]);
-  const [step, setStep] = useState<number>(() => {
-    const saved = LocalStorageAdapter.loadState();
-    return saved.pairs && saved.pairs.length > 0 ? 4 : 1;
-  });
+  const [step, setStep] = useState<number>(1);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
 
-  // Auto-guardado en LocalStorage
+  // Carga inicial desde Supabase (base de datos)
   useEffect(() => {
-    LocalStorageAdapter.saveState(eventConfig, participants, pairs);
-  }, [eventConfig, participants, pairs]);
+    const loadFromDatabase = async () => {
+      if (!isSupabaseConfigured()) {
+        setIsDbLoaded(true);
+        return;
+      }
+
+      try {
+        // Cargar el último grupo activo desde Supabase
+        const groups = await SupabaseStorageService.getAllGroups();
+        if (groups.length > 0) {
+          const latestGroup = groups[0]; // Ordenado por updated_at DESC
+          const loaded = await SupabaseStorageService.loadGroup(latestGroup.id);
+          if (loaded) {
+            setEventConfig(loaded.eventConfig);
+            setParticipants(loaded.participants);
+            setPairs(loaded.pairs);
+            setStep(loaded.step);
+          }
+        }
+      } catch (err) {
+        console.warn('Error al cargar desde la base de datos:', err);
+      } finally {
+        setIsDbLoaded(true);
+      }
+    };
+
+    loadFromDatabase();
+  }, []);
+
+  // Auto-guardado en la base de datos Supabase
+  useEffect(() => {
+    if (!isDbLoaded) return; // No guardar hasta que termine la carga inicial
+    if (!isSupabaseConfigured()) return;
+
+    const saveTimer = setTimeout(() => {
+      SupabaseStorageService.saveGroup(eventConfig, participants, pairs, step).catch(err => {
+        console.warn('Error al guardar en la base de datos:', err);
+      });
+    }, 500); // Debounce de 500ms para evitar guardados excesivos
+
+    return () => clearTimeout(saveTimer);
+  }, [eventConfig, participants, pairs, step, isDbLoaded]);
+
+  // Enlace grupal único para compartir con todo el grupo
+  const [groupShareResult, setGroupShareResult] = useState<GroupShareResult | null>(null);
 
   // Generar enlaces compartibles si ya hay parejas sorteadas
   useEffect(() => {
     if (pairs && pairs.length > 0) {
       const baseUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+      // Enlace grupal único (principal)
+      useCases.generateGroupShareLink(pairs, eventConfig, baseUrl).then(result => {
+        setGroupShareResult(result);
+      });
+
+      // Enlaces individuales (secundarios)
       useCases.generateShareableLinks(pairs, eventConfig, baseUrl).then(items => {
         setShareableItems(items);
       });
     } else {
+      setGroupShareResult(null);
       setShareableItems([]);
     }
   }, [pairs, eventConfig, useCases]);
@@ -237,7 +266,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const resetAll = () => {
-    LocalStorageAdapter.clearState();
     setEventConfig(defaultInitialConfig);
     setParticipants([]);
     setPairs(null);
@@ -267,27 +295,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    */
   const switchGroup = async (groupId: string): Promise<boolean> => {
     try {
-      // 1. Intentar cargar desde Supabase si está activo
-      if (isSupabaseConfigured()) {
-        const cloudGroup = await SupabaseStorageService.loadGroup(groupId);
-        if (cloudGroup) {
-          setEventConfig(cloudGroup.eventConfig);
-          setParticipants(cloudGroup.participants);
-          setPairs(cloudGroup.pairs);
-          setStep(cloudGroup.step);
-          LocalStorageAdapter.setActiveGroupId(groupId);
-          return true;
-        }
-      }
+      if (!isSupabaseConfigured()) return false;
 
-      // 2. Cargar desde LocalStorage
-      const localGroup = LocalStorageAdapter.loadGroup(groupId);
-      if (localGroup) {
-        setEventConfig(localGroup.eventConfig);
-        setParticipants(localGroup.participants);
-        setPairs(localGroup.pairs);
-        setStep(localGroup.step);
-        LocalStorageAdapter.setActiveGroupId(groupId);
+      const cloudGroup = await SupabaseStorageService.loadGroup(groupId);
+      if (cloudGroup) {
+        setEventConfig(cloudGroup.eventConfig);
+        setParticipants(cloudGroup.participants);
+        setPairs(cloudGroup.pairs);
+        setStep(cloudGroup.step);
         return true;
       }
 
@@ -302,16 +317,22 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    * Crea un nuevo grupo limpio
    */
   const createNewGroup = (title?: string) => {
-    const created = LocalStorageAdapter.createNewGroup(title);
-    setEventConfig(created.eventConfig);
-    setParticipants(created.participants);
-    setPairs(created.pairs);
+    const newConfig = new EventConfig({
+      title: title || 'Amor y Amistad 2026',
+      maxBudget: 60000,
+      currency: 'COP',
+      deliveryDateIso: defaultDeliveryDate.toISOString(),
+      notes: 'Entrega de regalos con endulzada y compartir especial.',
+    });
+    setEventConfig(newConfig);
+    setParticipants([]);
+    setPairs(null);
     setShareableItems([]);
     setStep(1);
     setErrorMessage(null);
 
     if (isSupabaseConfigured()) {
-      SupabaseStorageService.saveGroup(created.eventConfig, [], null, 1).catch(() => {});
+      SupabaseStorageService.saveGroup(newConfig, [], null, 1).catch(() => {});
     }
   };
 
@@ -325,6 +346,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         participants,
         pairs,
         shareableItems,
+        groupShareResult,
         step,
         errorMessage,
         feasibility,

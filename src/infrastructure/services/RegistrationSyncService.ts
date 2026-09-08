@@ -2,7 +2,7 @@ import { Participant } from '../../core/domain/entities/Participant';
 import { EventConfig } from '../../core/domain/entities/EventConfig';
 import { SupabaseStorageService } from '../storage/SupabaseStorageService';
 import { isSupabaseConfigured } from '../storage/supabaseClient';
-import { LocalStorageAdapter } from '../storage/LocalStorageAdapter';
+
 
 export interface RegistrationInvitePayload {
   eventId: string;
@@ -121,20 +121,6 @@ export class RegistrationSyncService {
           notes: groupData.eventConfig.notes,
         };
       }
-    }
-
-    // 3. Fallback en LocalStorage (por si se abre en el mismo navegador)
-    const localGroup = LocalStorageAdapter.loadGroup(roomIdOrToken);
-    if (localGroup) {
-      return {
-        eventId: localGroup.eventConfig.id,
-        cloudRoomId: localGroup.eventConfig.id,
-        eventTitle: localGroup.eventConfig.title,
-        maxBudget: localGroup.eventConfig.maxBudget,
-        currency: localGroup.eventConfig.currency,
-        deliveryDateIso: localGroup.eventConfig.deliveryDateIso,
-        notes: localGroup.eventConfig.notes,
-      };
     }
 
     return null;

@@ -2,7 +2,7 @@ import { Participant } from '../../domain/entities/Participant';
 import { EventConfig } from '../../domain/entities/EventConfig';
 import { DrawPair } from '../../domain/entities/DrawPair';
 import type { IDrawEngine } from '../../domain/services/IDrawEngine';
-import type { ICryptoService, SecretRevealPayload } from '../../domain/services/ICryptoService';
+import type { ICryptoService, SecretRevealPayload, GroupRevealPayload, GroupRevealEntry } from '../../domain/services/ICryptoService';
 import { formatColombiaDateTime } from '../../domain/utils/dateFormatters';
 
 export interface ShareableItem {
@@ -13,7 +13,18 @@ export interface ShareableItem {
 }
 
 /**
- * Casos de uso orquestadores para el Sorteo de Amor y Amistad
+ * Resultado del enlace grupal único: URL + mensaje de WhatsApp
+ */
+export interface GroupShareResult {
+  shareUrl: string;
+  whatsappUrl: string;
+  whatsappMessage: string;
+}
+
+/**
+ * Casos de uso orquestadores para el Sorteo de Amor y Amistad.
+ * Aplica el principio de Inversión de Dependencias (DIP) inyectando
+ * las abstracciones IDrawEngine e ICryptoService.
  */
 export class DrawUseCases {
   private readonly drawEngine: IDrawEngine;
@@ -32,6 +43,61 @@ export class DrawUseCases {
    */
   public executeDraw(participants: Participant[]): DrawPair[] {
     return this.drawEngine.execute(participants);
+  }
+
+  /**
+   * Genera UN SOLO enlace compartido para TODO el grupo.
+   * Todos los participantes abren el mismo enlace, seleccionan su nombre,
+   * ingresan su PIN de 4 dígitos y descubren a su amigo secreto.
+   */
+  public async generateGroupShareLink(
+    pairs: DrawPair[],
+    eventConfig: EventConfig,
+    baseUrl: string
+  ): Promise<GroupShareResult> {
+    const entries: GroupRevealEntry[] = pairs.map(pair => ({
+      giverName: pair.giver.name,
+      giverPin: pair.giver.pin,
+      receiverName: pair.receiver.name,
+      receiverWish: pair.receiver.giftWish,
+    }));
+
+    const payload: GroupRevealPayload = {
+      eventTitle: eventConfig.title,
+      maxBudget: eventConfig.maxBudget,
+      currency: eventConfig.currency,
+      deliveryDateIso: eventConfig.deliveryDateIso,
+      notes: eventConfig.notes,
+      drawTimestamp: Date.now(),
+      entries,
+    };
+
+    const token = await this.cryptoService.encodeGroupPayload(payload);
+    const cleanBaseUrl = baseUrl.split('#')[0].split('?')[0];
+    const shareUrl = `${cleanBaseUrl}#sorteo=${token}`;
+
+    const formattedDate = formatColombiaDateTime(eventConfig.deliveryDateIso);
+    const formattedBudget = eventConfig.getFormattedBudget();
+
+    const whatsappMessage =
+`💌 *Sorteo de Amor y Amistad: ${eventConfig.title}* 💌
+
+¡Ya se realizó el sorteo oficial de nuestro juego de Amor y Amistad! 🎁✨
+
+🗓️ *Fecha y hora de entrega (Colombia):*
+${formattedDate}
+
+💰 *Valor máximo del regalo:*
+${formattedBudget}
+
+${eventConfig.notes ? `📍 *Lugar / Indicaciones:* ${eventConfig.notes}\n` : ''}🔐 *Abre tu sobre digital aquí:*
+${shareUrl}
+
+_(Selecciona tu nombre, ingresa tu PIN de 4 dígitos y descubre a tu amigo secreto)_ 🤫✨`;
+
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMessage)}`;
+
+    return { shareUrl, whatsappUrl, whatsappMessage };
   }
 
   /**
@@ -55,18 +121,17 @@ export class DrawUseCases {
         deliveryDateIso: eventConfig.deliveryDateIso,
         notes: eventConfig.notes,
         giverName: pair.giver.name,
+        giverPin: pair.giver.pin,
         receiverName: pair.receiver.name,
         receiverWish: pair.receiver.giftWish,
         drawTimestamp: Date.now(),
       };
 
       const token = await this.cryptoService.encodePayload(payload);
-      // Estructura de URL basada en hash para funcionar en cualquier hosting estático gratuito
       const cleanBaseUrl = baseUrl.split('#')[0].split('?')[0];
       const shareUrl = `${cleanBaseUrl}#revelar=${token}`;
 
-      // Mensaje cordial y festivo para WhatsApp
-      const whatsappMessage = 
+      const whatsappMessage =
 `💌 *Sorteo de Amor y Amistad: ${eventConfig.title}* 💌
 
 ¡Hola *${pair.giver.name}*! 👋
@@ -78,13 +143,11 @@ ${formattedDate}
 💰 *Valor máximo del regalo:*
 ${formattedBudget}
 
-${eventConfig.notes ? `📍 *Lugar / Indicaciones:* ${eventConfig.notes}\n` : ''}
-🔐 *Descubre a quién te corresponde regalarle en tu sobre secreto:*
+${eventConfig.notes ? `📍 *Lugar / Indicaciones:* ${eventConfig.notes}\n` : ''}🔐 *Descubre a quién te corresponde regalarle en tu sobre secreto:*
 ${shareUrl}
 
 _(Abre el enlace para descubrir a tu amigo secreto de forma 100% privada)_ ✨`;
 
-      // Generar link de WhatsApp (api.whatsapp.com o wa.me)
       let phoneParam = '';
       if (pair.giver.phone) {
         const cleanedPhone = pair.giver.phone.replace(/\D/g, '');
@@ -107,7 +170,7 @@ _(Abre el enlace para descubrir a tu amigo secreto de forma 100% privada)_ ✨`;
   }
 
   /**
-   * Procesa y descifra el secreto cuando un participante abre su enlace
+   * Procesa y descifra el secreto cuando un participante abre su enlace individual
    */
   public async revealSecret(token: string): Promise<SecretRevealPayload | null> {
     return this.cryptoService.decodePayload(token);

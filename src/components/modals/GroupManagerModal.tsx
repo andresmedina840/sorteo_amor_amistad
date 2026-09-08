@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FolderKanban, Plus, Check, Trash2, Calendar, Users, DollarSign, X, RefreshCw } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
-import { LocalStorageAdapter, type GroupSummary } from '../../infrastructure/storage/LocalStorageAdapter';
 import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService';
 import { isSupabaseConfigured } from '../../infrastructure/storage/supabaseClient';
 import { formatColombiaDateTime } from '../../core/domain/utils/dateFormatters';
@@ -15,34 +14,18 @@ interface GroupManagerModalProps {
 
 export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, onClose }) => {
   const { eventConfig, switchGroup, createNewGroup } = useGame();
-  const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; title: string; maxBudget: number; deliveryDateIso: string; participantsCount: number; hasDrawn: boolean; updatedAt: number }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<{ id: string; title: string } | null>(null);
 
   const loadAllGroups = async () => {
     setIsLoading(true);
     try {
-      const localSummaries = LocalStorageAdapter.getGroupsSummary();
-
       if (isSupabaseConfigured()) {
         const cloudSummaries = await SupabaseStorageService.getAllGroups();
-        // Combinar evitando duplicados por ID
-        const map = new Map<string, GroupSummary>();
-        localSummaries.forEach(g => map.set(g.id, g));
-        cloudSummaries.forEach(g => {
-          map.set(g.id, {
-            id: g.id,
-            title: g.title,
-            maxBudget: g.maxBudget,
-            deliveryDateIso: g.deliveryDateIso,
-            participantsCount: g.participantsCount,
-            hasDrawn: g.hasDrawn,
-            updatedAt: g.updatedAt,
-          });
-        });
-        setGroups(Array.from(map.values()).sort((a, b) => b.updatedAt - a.updatedAt));
+        setGroups(cloudSummaries.sort((a, b) => b.updatedAt - a.updatedAt));
       } else {
-        setGroups(localSummaries);
+        setGroups([]);
       }
     } catch (err) {
       console.warn('Error al listar grupos:', err);
@@ -85,7 +68,6 @@ export const GroupManagerModal: React.FC<GroupManagerModalProps> = ({ isOpen, on
 
   const handleConfirmDelete = async (groupId: string, title: string) => {
     try {
-      LocalStorageAdapter.deleteGroup(groupId);
       if (isSupabaseConfigured()) {
         await SupabaseStorageService.deleteGroup(groupId);
       }
