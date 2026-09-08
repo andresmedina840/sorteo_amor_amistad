@@ -4,7 +4,7 @@ import { Share2, Copy, Send, Users, UserPlus, Trash2, ArrowLeft, ArrowRight, Gif
 import { useGame } from '../../context/GameContext';
 import { RegistrationSyncService, type PlayerRegistrationData } from '../../infrastructure/services/RegistrationSyncService';
 import { showToast, showConfirmDialog } from '../../core/domain/utils/alertUtils';
-import { validateColombiaPhone, formatColombiaPhone } from '../../core/domain/utils/phoneUtils';
+import { formatColombiaPhone } from '../../core/domain/utils/phoneUtils';
 import type { Participant } from '../../core/domain/entities/Participant';
 
 export const Step2PlayerRegistration: React.FC = () => {
@@ -16,7 +16,6 @@ export const Step2PlayerRegistration: React.FC = () => {
   // Formulario manual opcional con nombre único en mayúsculas
   const [manualName, setManualName] = useState('');
   const [manualPin, setManualPin] = useState('1234');
-  const [manualPhone, setManualPhone] = useState('');
   const [manualWish, setManualWish] = useState('');
   const [showPinsMap, setShowPinsMap] = useState<Record<string, boolean>>({});
 
@@ -163,26 +162,14 @@ ${inviteUrl}`;
       return;
     }
 
-    let cleanPhone: string | undefined = undefined;
-    if (manualPhone.trim()) {
-      const validation = validateColombiaPhone(manualPhone);
-      if (!validation.isValid) {
-        showToast(validation.errorMessage || 'El celular debe tener 10 dígitos', 'warning');
-        return;
-      }
-      cleanPhone = validation.cleanPhone;
-    }
-
     addParticipant({
       name: fullUpperName,
-      phone: cleanPhone,
       pin: cleanPin,
       giftWish: manualWish.trim() || undefined,
     });
 
     setManualName('');
     setManualPin(Math.floor(1000 + Math.random() * 9000).toString());
-    setManualPhone('');
     setManualWish('');
     showToast(`¡${fullUpperName} agregado con PIN ${cleanPin}!`, 'success');
   };
@@ -479,24 +466,6 @@ ${inviteUrl}`;
             </div>
 
             <div className="form-group">
-              <label className="form-label">WhatsApp / Celular (Opcional)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <div style={{ background: 'rgba(255,255,255,0.06)', padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: '0.85rem', fontWeight: 600 }}>
-                  🇨🇴 +57
-                </div>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  className="form-input"
-                  value={manualPhone}
-                  onChange={e => setManualPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="3001234567 (Opcional)"
-                />
-              </div>
-            </div>
-
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="form-label">¿Qué regalos quiere? (Opcional)</label>
               <input
                 type="text"
