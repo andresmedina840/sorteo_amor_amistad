@@ -29,7 +29,10 @@ export class Participant {
     this.id = params.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `part_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     this.name = trimmedName;
     this.phone = params.phone ? params.phone.trim() : '';
-    this.pin = params.pin ? params.pin.trim() : '';
+    const cleanPin = params.pin ? params.pin.trim().replace(/\D/g, '') : '';
+    this.pin = cleanPin.length === 4
+      ? cleanPin
+      : Math.floor(1000 + Math.random() * 9000).toString();
     this.giftWish = params.giftWish ? params.giftWish.trim() : '';
     this.familyId = params.familyId && params.familyId.trim().length > 0 ? params.familyId.trim() : null;
     this.excludedParticipantIds = params.excludedParticipantIds ? [...params.excludedParticipantIds] : [];

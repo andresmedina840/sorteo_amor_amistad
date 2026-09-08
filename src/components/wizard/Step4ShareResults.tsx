@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Copy, RotateCcw, Sparkles, Check, Clock, DollarSign, Download, Save, CheckCircle2, Lock, ShieldCheck, Key, ExternalLink } from 'lucide-react';
+import { Send, Copy, RotateCcw, Sparkles, Check, Clock, DollarSign, Download, Save, CheckCircle2, Lock, ShieldCheck, Key, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import type { ShareableItem } from '../../core/application/useCases/DrawUseCases';
 import { formatColombiaDateTime } from '../../core/domain/utils/dateFormatters';
@@ -9,6 +9,11 @@ import { showToast, showConfirmDialog, showSuccessAlert } from '../../core/domai
 export const Step4ShareResults: React.FC = () => {
   const { eventConfig, pairs, shareableItems, groupShareResult, resetDraw, deleteGroupWithPin } = useGame();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showPinsMap, setShowPinsMap] = useState<Record<string, boolean>>({});
+
+  const toggleShowPin = (id: string) => {
+    setShowPinsMap(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleCopyLink = async (item: ShareableItem) => {
     try {
@@ -51,8 +56,17 @@ ${formattedList}`;
   const handleDownloadBackup = () => {
     if (!pairs || !shareableItems.length) return;
 
+    const groupSection = groupShareResult ? `--------------------------------------------------------------------
+🌟 ENLACE ÚNICO DEL SORTEO (PARA TODO EL GRUPO):
+(Comparte este único enlace con todos por WhatsApp. Cada quien
+selecciona su nombre e ingresa su PIN para descubrir su amigo secreto)
+--------------------------------------------------------------------
+${groupShareResult.shareUrl}
+
+` : '';
+
     const linksList = shareableItems
-      .map((item, i) => `  ${i + 1}. ${item.giver.name}:\n     Enlace: ${item.shareUrl}`)
+      .map((item, i) => `  ${i + 1}. ${item.giver.name} (PIN: ${item.giver.pin || 'Sin PIN'}):\n     Enlace: ${item.shareUrl}`)
       .join('\n\n');
 
     const nowColombia = formatColombiaDateTime(new Date());
@@ -69,7 +83,7 @@ ${formattedList}`;
 ${eventConfig.notes ? `- Indicaciones / Lugar: ${eventConfig.notes}\n` : ''}- Fecha del Sorteo: ${nowColombia}
 - Total de Jugadores: ${pairs.length}
 
---------------------------------------------------------------------
+${groupSection}--------------------------------------------------------------------
 🔗 ENLACES SECRETOS INDIVIDUALES PARA CADA JUGADOR:
 (Comparte cada enlace únicamente con su dueño por WhatsApp o mensaje)
 --------------------------------------------------------------------
@@ -81,7 +95,7 @@ ${linksList}
 Por seguridad y máxima confidencialidad, las asignaciones son 100% ciegas.
 Ni el administrador ni nadie más puede ver a quién le regala cada persona.
 Cada jugador descubrirá a su amigo secreto de forma totalmente privada 
-únicamente al abrir su sobre cifrado con su respectivo enlace.
+únicamente al abrir su sobre cifrado con su respectivo enlace y PIN.
 
 ====================================================================
 ¡Sorteo generado con algoritmos de no-autoasignación y exclusión familiar!
@@ -349,13 +363,37 @@ Guarda este archivo en tu computador para tener respaldo permanente.
             }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: '1.1rem', color: '#fff' }}>
                   {index + 1}. {item.giver.name}
                 </strong>
                 <span style={{ fontSize: '0.75rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)', padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
                   🔒 Sobre Cifrado
                 </span>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    background: 'rgba(56, 189, 248, 0.12)',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    padding: '0.15rem 0.6rem',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: '0.8rem',
+                    color: '#7dd3fc',
+                  }}
+                >
+                  <Key size={12} />
+                  <span>PIN: {showPinsMap[item.giver.id] ? (item.giver.pin || '1234') : '••••'}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleShowPin(item.giver.id)}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#7dd3fc', display: 'flex' }}
+                    title={showPinsMap[item.giver.id] ? 'Ocultar PIN' : 'Ver PIN'}
+                  >
+                    {showPinsMap[item.giver.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                 {item.giver.phone ? `WhatsApp: ${item.giver.phone}` : 'Enlace privado listo'}

@@ -90,10 +90,14 @@ ${formattedDate}
 💰 *Valor máximo del regalo:*
 ${formattedBudget}
 
-${eventConfig.notes ? `📍 *Lugar / Indicaciones:* ${eventConfig.notes}\n` : ''}🔐 *Abre tu sobre digital aquí:*
+${eventConfig.notes ? `📍 *Lugar / Indicaciones:* ${eventConfig.notes}\n` : ''}🔐 *Abre tu sobre digital aquí (Enlace Único):*
 ${shareUrl}
 
-_(Selecciona tu nombre, ingresa tu PIN de 4 dígitos y descubre a tu amigo secreto)_ 🤫✨`;
+👉 *Pasos para descubrir a tu amigo secreto:*
+1. Abre el enlace arriba.
+2. Selecciona tu nombre de la lista.
+3. Ingresa tu PIN secreto de 4 dígitos.
+4. ¡Descubre a quién te tocó regalarle! 🤫✨`;
 
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappMessage)}`;
 
@@ -143,10 +147,12 @@ ${formattedDate}
 💰 *Valor máximo del regalo:*
 ${formattedBudget}
 
-${eventConfig.notes ? `📍 *Lugar / Indicaciones:* ${eventConfig.notes}\n` : ''}🔐 *Descubre a quién te corresponde regalarle en tu sobre secreto:*
+${eventConfig.notes ? `📍 *Lugar / Indicaciones:* ${eventConfig.notes}\n` : ''}🔐 *Tu sobre secreto personal:*
 ${shareUrl}
 
-_(Abre el enlace para descubrir a tu amigo secreto de forma 100% privada)_ ✨`;
+🔑 *Tu PIN secreto de acceso:* ${pair.giver.pin}
+
+_(Abre tu enlace, digita tu PIN secreto de 4 dígitos y descubre a tu amigo secreto de forma 100% privada)_ ✨`;
 
       let phoneParam = '';
       if (pair.giver.phone) {
