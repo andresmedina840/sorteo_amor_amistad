@@ -1,14 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Share2, Copy, Send, Users, UserPlus, Trash2, ArrowLeft, ArrowRight, Gift, Phone, Check, Sparkles } from 'lucide-react';
+import { Share2, Copy, Send, Users, UserPlus, Trash2, ArrowLeft, ArrowRight, Gift, Phone, Check, Sparkles, RefreshCw, Radio } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
-import { RegistrationSyncService } from '../../infrastructure/services/RegistrationSyncService';
+import { RegistrationSyncService, type PlayerRegistrationData } from '../../infrastructure/services/RegistrationSyncService';
 import { showToast, showConfirmDialog } from '../../core/domain/utils/alertUtils';
+import { validateColombiaPhone, formatColombiaPhone } from '../../core/domain/utils/phoneUtils';
 import type { Participant } from '../../core/domain/entities/Participant';
 
 export const Step2PlayerRegistration: React.FC = () => {
   const { eventConfig, participants, addParticipant, removeParticipant, setStep } = useGame();
   const [copiedLink, setCopiedLink] = useState(false);
+  const [cloudRoomId, setCloudRoomId] = useState<string>('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Formulario manual opcional
   const [manualName, setManualName] = useState('');
@@ -17,13 +20,106 @@ export const Step2PlayerRegistration: React.FC = () => {
 
   const syncService = useMemo(() => new RegistrationSyncService(), []);
   const [inviteUrl, setInviteUrl] = useState<string>('');
+  const participantsRef = useRef<Participant[]>(participants);
 
-  React.useEffect(() => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.href : '';
-    syncService.generateInviteLink(eventConfig, baseUrl).then(url => {
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
+
+  // Inicializar sala y generar enlace de registro
+  useEffect(() => {
+    const initRoom = async () => {
+      const baseUrl = typeof window !== 'undefined' ? window.location.href : '';
+      const roomId = await syncService.createOrGetRoom(eventConfig);
+      setCloudRoomId(roomId);
+      const url = await syncService.generateInviteLink(eventConfig, baseUrl);
       setInviteUrl(url);
-    });
+    };
+
+    initRoom();
   }, [eventConfig, syncService]);
+
+  // Función de sincronización con la nube
+  const syncWithCloud = async () => {
+    if (!cloudRoomId) return;
+    setIsSyncing(true);
+    try {
+      const cloudPlayers = await syncService.getCloudPlayers(cloudRoomId);
+      if (cloudPlayers && cloudPlayers.length > 0) {
+        const currentList = participantsRef.current;
+        for (const player of cloudPlayers) {
+          const alreadyExists = currentList.some(
+            p => p.name.trim().toLowerCase() === player.name.trim().toLowerCase()
+          );
+          if (!alreadyExists) {
+            addParticipant({
+              name: player.name.trim(),
+              phone: player.phone?.trim() || undefined,
+              giftWish: player.giftWish?.trim() || undefined,
+            });
+            showToast(`🎉 ¡${player.name} se registró automáticamente!`, 'success');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Error sincronizando con la nube:', err);
+    } finally {
+      setTimeout(() => setIsSyncing(false), 400);
+    }
+  };
+
+  // Sincronización periódica automática (polling cada 3.5s) y listener en vivo SSE
+  useEffect(() => {
+    if (!cloudRoomId) return;
+
+    // 1. Sincronizar de inmediato
+    syncWithCloud();
+
+    // 2. Polling periódico de seguridad
+    const intervalId = setInterval(() => {
+      syncWithCloud();
+    }, 3500);
+
+    // 3. Listener en tiempo real SSE (Server-Sent Events) via ntfy
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`https://ntfy.sh/sorteo_amoryamistad_${cloudRoomId}/sse`);
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data && data.message) {
+            const player = JSON.parse(data.message) as PlayerRegistrationData;
+            if (player && player.name) {
+              const currentList = participantsRef.current;
+              const alreadyExists = currentList.some(
+                p => p.name.trim().toLowerCase() === player.name.trim().toLowerCase()
+              );
+              if (!alreadyExists) {
+                addParticipant({
+                  name: player.name.trim(),
+                  phone: player.phone?.trim() || undefined,
+                  giftWish: player.giftWish?.trim() || undefined,
+                });
+                showToast(`🎉 ¡${player.name} acaba de registrarse!`, 'success');
+              }
+            }
+          }
+        } catch {
+          // Si el formato es plano, sincronizar con la nube
+          syncWithCloud();
+        }
+      };
+    } catch (err) {
+      console.warn('SSE no disponible, usando polling continuo.', err);
+    }
+
+    return () => {
+      clearInterval(intervalId);
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [cloudRoomId]);
 
   const handleCopyInvite = async () => {
     try {
@@ -45,17 +141,30 @@ export const Step2PlayerRegistration: React.FC = () => {
 👉 *Entra a este enlace para registrarte y colocar qué regalos te gustaría recibir:*
 ${inviteUrl}
 
-¡No te quedes por fuera! 🥳`;
+¡Tu registro es 100% automático! No te quedes por fuera 🥳`;
 
   const whatsappInviteUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappInviteMessage)}`;
 
   const handleAddManual = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualName.trim()) return;
+    if (!manualName.trim()) {
+      showToast('Por favor escribe el nombre del jugador', 'warning');
+      return;
+    }
+
+    let cleanPhone: string | undefined = undefined;
+    if (manualPhone.trim()) {
+      const validation = validateColombiaPhone(manualPhone);
+      if (!validation.isValid) {
+        showToast(validation.errorMessage || 'El celular debe tener 10 dígitos y comenzar por 3', 'warning');
+        return;
+      }
+      cleanPhone = validation.cleanPhone;
+    }
 
     addParticipant({
       name: manualName.trim(),
-      phone: manualPhone.trim() || undefined,
+      phone: cleanPhone,
       giftWish: manualWish.trim() || undefined,
     });
 
@@ -92,8 +201,7 @@ ${inviteUrl}
           <span>Enlace de Registro y Convocatoria de Jugadores</span>
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          Envía el enlace a tus amigos o familiares para que <strong>cada uno se registre y coloque qué regalos quiere</strong>.
-          Cuando todos estén anotados, continuaremos a asignar los familiares.
+          Envía el enlace a tus amigos o familiares. <strong>Al registrarse en su celular, aparecerán automáticamente en esta lista en tiempo real</strong> sin necesidad de enviar mensajes ni de tocar nada más.
         </p>
       </div>
 
@@ -108,14 +216,35 @@ ${inviteUrl}
           boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
-          <Sparkles size={20} color="#fbbf24" />
-          <h3 style={{ fontSize: '1.25rem', color: '#fff', margin: 0 }}>
-            Comparte este enlace para que los jugadores se registren:
-          </h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Sparkles size={20} color="#fbbf24" />
+            <h3 style={{ fontSize: '1.25rem', color: '#fff', margin: 0 }}>
+              Comparte este enlace para que los jugadores se registren:
+            </h3>
+          </div>
+
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              background: 'rgba(34, 197, 94, 0.15)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              color: '#4ade80',
+              padding: '0.25rem 0.65rem',
+              borderRadius: 'var(--radius-full)',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+            }}
+          >
+            <Radio size={12} className="pulse-slow" />
+            <span>Sincronización en vivo 100% automática</span>
+          </div>
         </div>
+
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-          Al abrir este enlace, cada participante ingresará su nombre y su lista de deseos de regalo de forma sencilla.
+          Al abrir este enlace, cada participante ingresará su nombre y su lista de deseos de regalo. El registro se guarda al instante.
         </p>
 
         {/* Barra de enlace y botones */}
@@ -158,11 +287,11 @@ ${inviteUrl}
         </div>
       </div>
 
-      {/* Lista de Jugadores Registrados */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      {/* Lista de Jugadores Registrados con barra de estado */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <h3 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
           <Users size={20} color="#fb7185" />
-          <span>Jugadores Registrados hasta el momento:</span>
+          <span>Jugadores Registrados en Tiempo Real:</span>
           <span
             style={{
               background: 'rgba(225, 29, 72, 0.2)',
@@ -178,17 +307,33 @@ ${inviteUrl}
           </span>
         </h3>
 
-        {participants.length < 3 && (
-          <span style={{ fontSize: '0.82rem', color: '#fca5a5' }}>
-            * Se necesitan al menos 3 jugadores para realizar el sorteo
-          </span>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            onClick={syncWithCloud}
+            title="Verificar nuevos registros en la nube"
+          >
+            <RefreshCw size={13} className={isSyncing ? 'spin-animation' : ''} />
+            <span>{isSyncing ? 'Actualizando...' : 'Actualizar ahora'}</span>
+          </button>
+
+          {participants.length < 3 && (
+            <span style={{ fontSize: '0.82rem', color: '#fca5a5' }}>
+              * Mínimo 3 jugadores para realizar el sorteo
+            </span>
+          )}
+        </div>
       </div>
 
       {participants.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '3rem 1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-subtle)', marginBottom: '2rem' }}>
           <Users size={44} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
           <p style={{ color: 'var(--text-muted)' }}>Esperando que los jugadores abran el enlace y se registren...</p>
+          <p style={{ color: '#4ade80', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            ⚡ Los registros aparecerán aquí automáticamente en cuanto los envíen.
+          </p>
         </div>
       ) : (
         <div className="participants-list" style={{ marginBottom: '2rem' }}>
@@ -208,9 +353,9 @@ ${inviteUrl}
                       {index + 1}. {p.name}
                     </strong>
                     {p.phone && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.15rem' }}>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.15rem' }}>
                         <Phone size={11} color="#4ade80" />
-                        <span>{p.phone}</span>
+                        <span style={{ color: '#4ade80', fontWeight: 600 }}>🇨🇴 +57 {formatColombiaPhone(p.phone)}</span>
                       </div>
                     )}
                   </div>
@@ -255,17 +400,25 @@ ${inviteUrl}
                 value={manualName}
                 onChange={e => setManualName(e.target.value)}
                 placeholder="Ej: Abuelita Carmen"
+                required
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Teléfono (Opcional)</label>
-              <input
-                type="tel"
-                className="form-input"
-                value={manualPhone}
-                onChange={e => setManualPhone(e.target.value)}
-                placeholder="+57 300 000 0000"
-              />
+              <label className="form-label">WhatsApp / Celular (10 dígitos empezando en 3)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <div style={{ background: 'rgba(255,255,255,0.06)', padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: '0.85rem', fontWeight: 600 }}>
+                  🇨🇴 +57
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  className="form-input"
+                  value={manualPhone}
+                  onChange={e => setManualPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="3001234567"
+                />
+              </div>
             </div>
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="form-label">¿Qué regalos quiere? (Opcional)</label>
@@ -288,7 +441,7 @@ ${inviteUrl}
       </details>
 
       {/* Navegación al Paso 3: Ya cuando estén todos registrados, ahí sí asignar familiares */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="step-nav-buttons" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <button type="button" className="btn btn-secondary" onClick={() => setStep(1)}>
           <ArrowLeft size={18} />
           <span>Volver a Configuración</span>

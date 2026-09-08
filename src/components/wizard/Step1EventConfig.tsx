@@ -201,7 +201,7 @@ export const Step1EventConfig: React.FC = () => {
       </div>
 
       {/* Botones de Acción: Guardar y Borrar con PIN */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="step-nav-buttons" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <button
           type="button"
           className="btn btn-danger-outline"

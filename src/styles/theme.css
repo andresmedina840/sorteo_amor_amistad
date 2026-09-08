@@ -56,6 +56,10 @@
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-main);
@@ -75,11 +79,14 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   line-height: 1.25;
   color: var(--text-primary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Scrollbar estilizada */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-main);
@@ -96,10 +103,11 @@ h1, h2, h3, h4, h5, h6 {
 .app-container {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
+  padding: clamp(1rem, 3vw, 2rem) clamp(0.75rem, 3vw, 1.5rem) 4rem;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 /* Header de la Aplicación */
@@ -107,6 +115,7 @@ h1, h2, h3, h4, h5, h6 {
   text-align: center;
   margin-bottom: 2rem;
   position: relative;
+  width: 100%;
 }
 
 .brand-badge {
@@ -123,39 +132,43 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 0.75rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .brand-title {
-  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-size: clamp(1.85rem, 6vw, 3.25rem);
   font-weight: 800;
   background: linear-gradient(135deg, #ffffff 30%, #fbcfe8 70%, #fb7185 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 0.5rem;
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .brand-subtitle {
   color: var(--text-secondary);
-  font-size: 1.05rem;
+  font-size: clamp(0.92rem, 2.5vw, 1.05rem);
   max-width: 620px;
   margin: 0 auto;
+  padding: 0 0.5rem;
 }
 
-/* Stepper / Pasos */
+/* Stepper / Pasos (Totalmente fluido y con scroll táctil en móvil) */
 .stepper-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   margin-bottom: 2.25rem;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
 .step-pill {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   padding: 0.5rem 1.1rem;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
@@ -165,6 +178,8 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
   transition: all 0.25s ease;
   backdrop-filter: blur(12px);
+  cursor: pointer;
+  user-select: none;
 }
 
 .step-pill.active {
@@ -189,6 +204,7 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   font-size: 0.8rem;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .step-pill.active .step-number {
@@ -206,11 +222,12 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--gradient-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 2rem;
+  padding: clamp(1.25rem, 4vw, 2.25rem);
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow-md);
   position: relative;
   overflow: hidden;
+  width: 100%;
 }
 
 .glass-panel::before {
@@ -223,17 +240,19 @@ h1, h2, h3, h4, h5, h6 {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
 }
 
-/* Formularios y Campos */
+/* Formularios y Campos (Responsive y adaptables a celulares) */
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  width: 100%;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 100%;
 }
 
 .form-label {
@@ -243,282 +262,173 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .form-input, .form-select, .form-textarea {
   width: 100%;
   padding: 0.85rem 1.1rem;
-  background: rgba(13, 8, 22, 0.75);
+  background: rgba(13, 8, 22, 0.8);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: var(--text-primary);
+  font-size: 16px; /* Evita auto-zoom de iOS en Safari/Chrome móvil */
   font-family: var(--font-sans);
-  font-size: 0.98rem;
   transition: all 0.2s ease;
   outline: none;
-}
-
-/* Ocultar flechas de subir y bajar en inputs numéricos */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-input[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.form-input:focus, .form-select:focus, .form-textarea:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.25);
-  background: rgba(22, 13, 38, 0.9);
+  min-height: 46px; /* Táctil óptimo */
+  box-sizing: border-box;
 }
 
 .form-textarea {
-  min-height: 90px;
+  min-height: 80px;
   resize: vertical;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2);
+  background: rgba(17, 10, 28, 0.95);
 }
 
 .form-helper {
   font-size: 0.8rem;
   color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.colombia-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: #fbbf24;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-/* Botones */
+/* Botones con tamaños táctiles excelentes para pulgar */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  padding: 0.85rem 1.75rem;
+  gap: 0.55rem;
+  padding: 0.85rem 1.4rem;
   border-radius: var(--radius-md);
-  font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   border: none;
   text-decoration: none;
-  position: relative;
-  overflow: hidden;
+  line-height: 1.2;
+  min-height: 44px; /* Táctil mínimo recomendado */
+  box-sizing: border-box;
+  text-align: center;
+  user-select: none;
+}
+
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btn-primary {
   background: var(--gradient-romantic);
   color: #ffffff;
-  box-shadow: 0 4px 20px var(--primary-glow);
+  box-shadow: 0 4px 18px var(--primary-glow);
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(225, 29, 72, 0.5);
-  filter: brightness(1.1);
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 50%, #9f1239 100%);
+  box-shadow: 0 6px 25px var(--primary-glow);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: var(--bg-glass-strong);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
 }
 
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.12);
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
 }
 
 .btn-whatsapp {
   background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
   color: #ffffff;
-  box-shadow: 0 4px 15px rgba(37, 211, 102, 0.35);
+  box-shadow: 0 4px 18px rgba(37, 211, 102, 0.3);
 }
 
-.btn-whatsapp:hover {
-  filter: brightness(1.08);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(37, 211, 102, 0.45);
+.btn-whatsapp:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2ae06d 0%, #17a090 100%);
+  box-shadow: 0 6px 24px rgba(37, 211, 102, 0.45);
+  transform: translateY(-1px);
 }
 
 .btn-gold {
   background: var(--gradient-gold);
-  color: #0c0814;
+  color: #1a1001;
   font-weight: 700;
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+  box-shadow: 0 4px 20px var(--accent-gold-glow);
 }
 
-.btn-gold:hover {
-  filter: brightness(1.1);
-  transform: translateY(-2px);
+.btn-gold:hover:not(:disabled) {
+  box-shadow: 0 6px 28px var(--accent-gold-glow);
+  transform: translateY(-1px);
 }
 
 .btn-danger-outline {
   background: transparent;
-  color: #f87171;
-  border: 1px solid rgba(248, 113, 113, 0.3);
-  padding: 0.45rem 0.85rem;
-  font-size: 0.85rem;
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 0.45rem 0.75rem;
+  min-height: 36px;
 }
 
 .btn-danger-outline:hover {
-  background: rgba(248, 113, 113, 0.12);
-  border-color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #f87171;
 }
 
-/* Tarjetas de Participantes */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Lista y Tarjetas de Participantes (Responsive Grid) */
 .participants-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-  gap: 1.25rem;
-  margin-top: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+  width: 100%;
 }
 
 .participant-card {
-  background: rgba(18, 11, 32, 0.7);
+  background: rgba(20, 13, 34, 0.75);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 1.25rem;
-  position: relative;
-  transition: all 0.2s ease;
+  padding: 1.15rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .participant-card:hover {
-  border-color: rgba(225, 29, 72, 0.4);
+  border-color: rgba(225, 29, 72, 0.35);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-.family-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
-  border-radius: var(--radius-full);
-  font-size: 0.78rem;
-  font-weight: 600;
-  background: rgba(168, 85, 247, 0.15);
-  color: #d8b4fe;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-}
-
-.no-family-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
-  border-radius: var(--radius-full);
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed rgba(255, 255, 255, 0.15);
-}
-
-/* Alertas y Notificaciones */
-.alert-box {
-  padding: 1rem 1.25rem;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: flex-start;
-  gap: 0.85rem;
-  margin: 1.25rem 0;
-  font-size: 0.92rem;
-}
-
-.alert-warning {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #fde68a;
-}
-
-.alert-error {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #fca5a5;
-}
-
-.alert-success {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #86efac;
-}
-
-.alert-info {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #93c5fd;
-}
-
-/* Sobre Mágico 3D de Amor y Amistad */
-.envelope-wrapper {
-  perspective: 1000px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin: 2.5rem 0;
-}
-
-.envelope-card {
-  width: 100%;
-  max-width: 480px;
-  min-height: 320px;
-  background: linear-gradient(135deg, #881337 0%, #4c0519 50%, #1f020a 100%);
-  border: 2px solid rgba(251, 191, 36, 0.4);
-  border-radius: var(--radius-xl);
-  padding: 2.5rem 2rem;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(225, 29, 72, 0.3);
-  text-align: center;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.3s ease;
-}
-
-.envelope-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent-gold);
-}
-
-.wax-seal {
-  width: 80px;
-  height: 80px;
-  background: radial-gradient(circle at 35% 35%, #f59e0b, #b45309, #78350f);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 1.5rem;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.4);
-  border: 2px solid #fbbf24;
-  color: #fff;
-  font-size: 2.2rem;
-}
-
-/* Contador Regresivo */
+/* Cuenta Regresiva */
 .countdown-grid {
   display: flex;
-  gap: 0.75rem;
   justify-content: center;
-  margin: 1.5rem 0;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
 .countdown-box {
-  background: rgba(13, 8, 22, 0.8);
-  border: 1px solid var(--border-subtle);
+  background: rgba(20, 13, 34, 0.85);
+  border: 1px solid var(--border-gold);
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
-  min-width: 75px;
+  min-width: 72px;
   text-align: center;
 }
 
@@ -545,31 +455,55 @@ input[type="number"] {
   padding-top: 3rem;
   color: var(--text-muted);
   font-size: 0.85rem;
+  line-height: 1.5;
 }
 
-@media (max-width: 640px) {
-  .app-container {
-    padding: 1rem 0.75rem 3rem;
-  }
-  .glass-panel {
-    padding: 1.25rem;
-  }
-  .btn {
-    width: 100%;
-  }
+/* Animaciones */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* SweetAlert2 Tema Amor y Amistad */
+.spin-animation {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.08); }
+}
+
+.pulse-slow {
+  animation: pulseSlow 2s ease-in-out infinite;
+}
+
+/* SweetAlert2 Tema Amor y Amistad Responsive */
 .swal2-popup.swal2-amor-amistad-popup {
   border: 1px solid rgba(251, 191, 36, 0.3) !important;
   border-radius: var(--radius-lg) !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(225, 29, 72, 0.3) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(225, 29, 72, 0.3) !important;
   backdrop-filter: blur(16px) !important;
   font-family: var(--font-sans) !important;
+  width: 92vw !important;
+  max-width: 520px !important;
+  padding: 1.5rem 1.25rem !important;
+}
+
+.swal2-popup.swal2-amor-amistad-popup .swal2-title {
+  font-size: clamp(1.2rem, 4vw, 1.6rem) !important;
+  line-height: 1.3 !important;
+}
+
+.swal2-popup.swal2-amor-amistad-popup .swal2-html-container {
+  font-size: clamp(0.88rem, 2.5vw, 1rem) !important;
+  line-height: 1.5 !important;
 }
 
 .swal2-popup.swal2-amor-amistad-popup .swal2-actions {
   gap: 0.75rem !important;
+  flex-wrap: wrap !important;
+  width: 100% !important;
+  justify-content: center !important;
 }
 
 .swal2-popup.swal2-amor-amistad-popup button.swal2-confirm {
@@ -577,11 +511,112 @@ input[type="number"] {
   border-radius: var(--radius-md) !important;
   font-weight: 600 !important;
   box-shadow: 0 4px 15px var(--primary-glow) !important;
+  min-height: 44px !important;
 }
 
 .swal2-popup.swal2-amor-amistad-popup button.swal2-cancel {
   background: rgba(255, 255, 255, 0.1) !important;
   border-radius: var(--radius-md) !important;
   font-weight: 500 !important;
+  min-height: 44px !important;
 }
 
+/* ==========================================================================
+   MEDIA QUERIES - RESPONSIVE DESIGN (TABLETS, CELULARES Y DISPOSITIVOS MÓVILES)
+   ========================================================================== */
+
+/* Tablets y Pantallas Medianas (<= 768px) */
+@media (max-width: 768px) {
+  .stepper-container {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    padding: 0.25rem 0.5rem 0.75rem;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+
+  .step-pill {
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    font-size: 0.85rem;
+    padding: 0.45rem 0.9rem;
+  }
+
+  .participants-list {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+/* Celulares Grandes y Estándar (<= 640px) */
+@media (max-width: 640px) {
+  .app-container {
+    padding: 0.75rem 0.65rem 3rem;
+  }
+
+  .glass-panel {
+    padding: 1.15rem 1rem;
+    border-radius: var(--radius-md);
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .participants-list {
+    grid-template-columns: 1fr;
+  }
+
+  .countdown-box {
+    min-width: 60px;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .countdown-val {
+    font-size: 1.45rem;
+  }
+
+  .countdown-lbl {
+    font-size: 0.65rem;
+  }
+
+  /* Botones principales de navegación apilados en móvil */
+  .step-nav-buttons {
+    flex-direction: column-reverse !important;
+    width: 100%;
+  }
+
+  .step-nav-buttons .btn {
+    width: 100% !important;
+  }
+}
+
+/* Celulares Pequeños (<= 480px, ej: iPhone SE, Galaxy Mini) */
+@media (max-width: 480px) {
+  .brand-title {
+    font-size: 1.75rem;
+  }
+
+  .brand-subtitle {
+    font-size: 0.88rem;
+  }
+
+  .step-pill {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .step-pill span:not(.step-number) {
+    font-size: 0.8rem;
+  }
+
+  .glass-panel {
+    padding: 1rem 0.85rem;
+  }
+
+  .form-input, .form-textarea {
+    font-size: 16px;
+    padding: 0.75rem 0.9rem;
+  }
+}
