@@ -6,6 +6,7 @@ import { Step2PlayerRegistration } from './components/wizard/Step2PlayerRegistra
 import { Step3AssignFamilies } from './components/wizard/Step3AssignFamilies';
 import { Step4ShareResults } from './components/wizard/Step4ShareResults';
 import { RevealPage } from './components/reveal/RevealPage';
+import { GroupEnvelopeRevealPage } from './components/reveal/GroupEnvelopeRevealPage';
 import { PlayerRegistrationPage } from './components/registration/PlayerRegistrationPage';
 import { RegistrationSyncService } from './infrastructure/services/RegistrationSyncService';
 import { showSuccessAlert } from './core/domain/utils/alertUtils';
@@ -31,6 +32,7 @@ const AppContent: React.FC = () => {
   const { addParticipant } = useGame();
   const [revealToken, setRevealToken] = useState<string | null>(null);
   const [registerToken, setRegisterToken] = useState<string | null>(null);
+  const [sobresGroupId, setSobresGroupId] = useState<string | null>(null);
   const syncService = useMemo(() => new RegistrationSyncService(), []);
 
   // Escuchar cambios en la URL (soporte para enlaces de WhatsApp con hash)
@@ -41,9 +43,16 @@ const AppContent: React.FC = () => {
       if (hash.startsWith('#revelar=')) {
         setRevealToken(hash.replace('#revelar=', ''));
         setRegisterToken(null);
+        setSobresGroupId(null);
       } else if (hash.startsWith('#registro=')) {
         setRegisterToken(hash.replace('#registro=', ''));
         setRevealToken(null);
+        setSobresGroupId(null);
+      } else if (hash.startsWith('#sobres')) {
+        const cleanId = hash.replace('#sobres=', '').replace('#sobres', '');
+        setSobresGroupId(cleanId || '');
+        setRevealToken(null);
+        setRegisterToken(null);
       } else if (hash.startsWith('#agregar=')) {
         // Enlace de auto-inscripción que llega al organizador
         const playerToken = hash.replace('#agregar=', '');
@@ -52,6 +61,7 @@ const AppContent: React.FC = () => {
           addParticipant({
             name: player.name,
             phone: player.phone,
+            pin: player.pin,
             giftWish: player.giftWish,
           });
           showSuccessAlert(
@@ -62,9 +72,11 @@ const AppContent: React.FC = () => {
         window.location.hash = '';
         setRevealToken(null);
         setRegisterToken(null);
+        setSobresGroupId(null);
       } else {
         setRevealToken(null);
         setRegisterToken(null);
+        setSobresGroupId(null);
       }
     };
 
@@ -77,6 +89,7 @@ const AppContent: React.FC = () => {
     window.location.hash = '';
     setRevealToken(null);
     setRegisterToken(null);
+    setSobresGroupId(null);
   };
 
   return (
@@ -85,6 +98,8 @@ const AppContent: React.FC = () => {
         <RevealPage token={revealToken} onGoHome={handleGoHome} />
       ) : registerToken ? (
         <PlayerRegistrationPage inviteToken={registerToken} onGoHome={handleGoHome} />
+      ) : sobresGroupId !== null ? (
+        <GroupEnvelopeRevealPage groupId={sobresGroupId || undefined} onGoHome={handleGoHome} />
       ) : (
         <MainWizard />
       )}

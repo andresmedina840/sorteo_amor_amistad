@@ -21,6 +21,7 @@ export interface SupabaseParticipantRow {
   group_id: string;
   name: string;
   phone: string;
+  pin: string;
   gift_wish: string;
   family_id: string | null;
   excluded_participant_ids: string[];
@@ -74,6 +75,7 @@ export class SupabaseStorageService {
           group_id: eventConfig.id,
           name: p.name,
           phone: p.phone,
+          pin: p.pin,
           gift_wish: p.giftWish,
           family_id: p.familyId,
           excluded_participant_ids: p.excludedParticipantIds,
@@ -138,6 +140,7 @@ export class SupabaseStorageService {
           id: p.id,
           name: p.name,
           phone: p.phone || '',
+          pin: p.pin || '',
           giftWish: p.gift_wish || '',
           familyId: p.family_id,
           excludedParticipantIds: p.excluded_participant_ids || [],
@@ -213,7 +216,7 @@ export class SupabaseStorageService {
    */
   public static async registerParticipant(
     groupId: string,
-    participant: { id?: string; name: string; phone?: string; giftWish?: string }
+    participant: { id?: string; name: string; phone?: string; pin?: string; giftWish?: string }
   ): Promise<boolean> {
     const client = getSupabaseClient();
     if (!client || !groupId) return false;
@@ -225,6 +228,7 @@ export class SupabaseStorageService {
         group_id: groupId,
         name: participant.name.trim().toUpperCase(),
         phone: participant.phone?.trim() || '',
+        pin: participant.pin?.trim() || '',
         gift_wish: participant.giftWish?.trim() || '',
         family_id: null,
         excluded_participant_ids: [],
@@ -258,6 +262,7 @@ export class SupabaseStorageService {
           id: p.id,
           name: p.name,
           phone: p.phone || '',
+          pin: p.pin || '',
           giftWish: p.gift_wish || '',
           familyId: p.family_id,
           excludedParticipantIds: p.excluded_participant_ids || [],

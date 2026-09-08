@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Gift, Calendar, DollarSign, UserCheck, ArrowLeft, CheckCircle2, AlertCircle, Sparkles, Loader2, Phone, User } from 'lucide-react';
+import { Gift, Calendar, DollarSign, UserCheck, ArrowLeft, CheckCircle2, AlertCircle, Sparkles, Loader2, Phone, User, Key, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { RegistrationSyncService } from '../../infrastructure/services/RegistrationSyncService';
 import type { RegistrationInvitePayload } from '../../infrastructure/services/RegistrationSyncService';
@@ -52,13 +52,15 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
     loadEventData();
   }, [inviteToken, syncService]);
 
-  // Nombres y Apellidos separados (Todo en Mayúsculas)
-  const [firstName, setFirstName] = useState('');
-  const [secondName, setSecondName] = useState('');
-  const [firstLastName, setFirstLastName] = useState('');
-  const [secondLastName, setSecondLastName] = useState('');
+  // Nombre único del participante (en Mayúsculas)
+  const [name, setName] = useState('');
 
   const [registeredFullName, setRegisteredFullName] = useState('');
+
+  // PIN personal de 4 dígitos para ver quién le salió
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [showPin, setShowPin] = useState(false);
 
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -122,32 +124,32 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const cleanFirstName = firstName.trim().toUpperCase();
-    const cleanSecondName = secondName.trim().toUpperCase();
-    const cleanFirstLastName = firstLastName.trim().toUpperCase();
-    const cleanSecondLastName = secondLastName.trim().toUpperCase();
+    const fullUpperName = name.trim().toUpperCase();
 
-    if (!cleanFirstName) {
-      showToast('Por favor escribe tu PRIMER NOMBRE', 'warning');
+    if (!fullUpperName) {
+      showToast('Por favor escribe tu NOMBRE COMPLETO', 'warning');
       return;
     }
 
-    if (!cleanFirstLastName) {
-      showToast('Por favor escribe tu PRIMER APELLIDO', 'warning');
+    // Validación del PIN de 4 dígitos
+    const cleanPin = pin.trim().replace(/\D/g, '');
+    if (cleanPin.length !== 4) {
+      setPinError('Debes ingresar exactamente 4 números para tu PIN secreto.');
+      showToast('Crea tu PIN de 4 dígitos para poder ver a tu amigo secreto', 'warning');
       return;
     }
+    setPinError(null);
 
-    // Nombre completo unificado en MAYÚSCULAS
-    const fullUpperName = [cleanFirstName, cleanSecondName, cleanFirstLastName, cleanSecondLastName]
-      .filter(Boolean)
-      .join(' ');
-
-    // Validación estricta del número de celular en Colombia
-    const phoneValidation = validateColombiaPhone(phone);
-    if (!phoneValidation.isValid) {
-      setPhoneError(phoneValidation.errorMessage || 'Número de celular no válido');
-      showToast(phoneValidation.errorMessage || 'El número de WhatsApp es obligatorio y debe tener 10 dígitos iniciando en 3', 'warning');
-      return;
+    // Celular opcional: si lo coloca, lo validamos con formato Colombia
+    let cleanPhoneNumber = '';
+    if (phone.trim()) {
+      const phoneValidation = validateColombiaPhone(phone);
+      if (!phoneValidation.isValid) {
+        setPhoneError(phoneValidation.errorMessage || 'Número de celular no válido');
+        showToast(phoneValidation.errorMessage || 'El celular debe tener 10 dígitos', 'warning');
+        return;
+      }
+      cleanPhoneNumber = phoneValidation.cleanPhone;
     }
 
     if (!giftWish.trim()) {
@@ -158,13 +160,12 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
     setIsSubmitting(true);
     setPhoneError(null);
 
-    const cleanPhoneNumber = phoneValidation.cleanPhone;
-
     // 1. Agregar a la sesión local por si comparte el mismo navegador
     try {
       addParticipant({
         name: fullUpperName,
-        phone: cleanPhoneNumber,
+        phone: cleanPhoneNumber || undefined,
+        pin: cleanPin,
         giftWish: giftWish.trim() || undefined,
       });
     } catch {}
@@ -175,11 +176,12 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
       eventId: eventDetails.eventId,
       name: fullUpperName,
       phone: cleanPhoneNumber,
+      pin: cleanPin,
       giftWish: giftWish.trim(),
       registeredAt: Date.now(),
     };
 
-    const cloudSuccess = await syncService.registerPlayerInCloud(eventDetails.cloudRoomId, playerData);
+    await syncService.registerPlayerInCloud(eventDetails.cloudRoomId, playerData);
 
     setIsSubmitting(false);
     setRegisteredFullName(fullUpperName);
@@ -192,17 +194,10 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
       colors: ['#e11d48', '#fb7185', '#fbbf24', '#22c55e', '#ffffff'],
     });
 
-    if (cloudSuccess) {
-      showSuccessAlert(
-        `¡Registro Exitoso!`,
-        `Te has inscrito <strong>100% automáticamente</strong> como <strong>${fullUpperName}</strong> en el sorteo de <strong>${eventDetails.eventTitle}</strong>.<br/><br/>Tu WhatsApp <strong>+57 ${formatColombiaPhone(cleanPhoneNumber)}</strong> y lista de regalos ya están guardados en la pantalla del organizador. <strong>Ya puedes cerrar esta ventana con total tranquilidad.</strong>`
-      );
-    } else {
-      showSuccessAlert(
-        `¡Registro Recibido!`,
-        `Tu inscripción como <strong>${fullUpperName}</strong> para <strong>${eventDetails.eventTitle}</strong> ha sido procesada. Puedes cerrar esta ventana con total tranquilidad.`
-      );
-    }
+    showSuccessAlert(
+      `¡Registro Exitoso!`,
+      `Te has inscrito como <strong>${fullUpperName}</strong> en el sorteo de <strong>${eventDetails.eventTitle}</strong>.<br/><br/>🔑 <strong>Tu PIN personal secreto es: <span style="font-size: 1.4rem; color: #fbbf24; font-family: monospace; letter-spacing: 0.15em;">${cleanPin}</span></strong><br/><br/>⚠️ <strong>Recuerda muy bien este PIN</strong>, ya que con él podrás abrir tu sobre digital para ver quién te salió.`
+    );
   };
 
   return (
@@ -260,89 +255,100 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
 
       {!isRegistered ? (
         <form onSubmit={handleSubmit}>
-          {/* Sección de Nombres y Apellidos Separados en Mayúsculas */}
+          {/* Campo único de Nombre del Participante */}
           <div style={{ marginBottom: '1.5rem', background: 'rgba(255, 255, 255, 0.02)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fb7185', textTransform: 'uppercase', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <User size={15} />
-              <span>DATOS DEL PARTICIPANTE (TODO EN MAYÚSCULAS)</span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="first-name">
-                  <span>PRIMER NOMBRE *</span>
-                </label>
-                <input
-                  id="first-name"
-                  type="text"
-                  className="form-input"
-                  style={{ textTransform: 'uppercase' }}
-                  value={firstName}
-                  onChange={e => setFirstName(e.target.value.toUpperCase())}
-                  placeholder="EJ: LAURA"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="second-name">
-                  <span>SEGUNDO NOMBRE (OPCIONAL)</span>
-                </label>
-                <input
-                  id="second-name"
-                  type="text"
-                  className="form-input"
-                  style={{ textTransform: 'uppercase' }}
-                  value={secondName}
-                  onChange={e => setSecondName(e.target.value.toUpperCase())}
-                  placeholder="EJ: ANDREA"
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="first-last-name">
-                  <span>PRIMER APELLIDO *</span>
-                </label>
-                <input
-                  id="first-last-name"
-                  type="text"
-                  className="form-input"
-                  style={{ textTransform: 'uppercase' }}
-                  value={firstLastName}
-                  onChange={e => setFirstLastName(e.target.value.toUpperCase())}
-                  placeholder="EJ: GÓMEZ"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="second-last-name">
-                  <span>SEGUNDO APELLIDO (OPCIONAL)</span>
-                </label>
-                <input
-                  id="second-last-name"
-                  type="text"
-                  className="form-input"
-                  style={{ textTransform: 'uppercase' }}
-                  value={secondLastName}
-                  onChange={e => setSecondLastName(e.target.value.toUpperCase())}
-                  placeholder="EJ: RESTREPO"
-                  disabled={isSubmitting}
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="player-name" style={{ color: '#fb7185', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}>
+                <User size={16} />
+                <span>NOMBRE COMPLETO *</span>
+              </label>
+              <input
+                id="player-name"
+                type="text"
+                className="form-input"
+                style={{ textTransform: 'uppercase', fontSize: '1.05rem', fontWeight: 600, padding: '0.85rem 1rem' }}
+                value={name}
+                onChange={e => setName(e.target.value.toUpperCase())}
+                placeholder="EJ: CARLOS ALBERTO GÓMEZ"
+                required
+                disabled={isSubmitting}
+              />
+              <span className="form-helper" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.35rem', display: 'block' }}>
+                Escribe tu nombre para identificarte en la lista del sorteo
+              </span>
             </div>
           </div>
 
-          {/* Campo de WhatsApp Colombia */}
+          {/* Campo de PIN Personal Secreto (4 dígitos) para ver quién le salió */}
+          <div
+            style={{
+              marginBottom: '1.5rem',
+              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(225, 29, 72, 0.1) 100%)',
+              border: '2px solid rgba(251, 191, 36, 0.35)',
+              borderRadius: 'var(--radius-md)',
+              padding: '1.25rem',
+            }}
+          >
+            <label className="form-label" htmlFor="player-pin" style={{ color: '#fbbf24', fontSize: '1rem', fontWeight: 700 }}>
+              <Key size={18} color="#fbbf24" />
+              <span>CREA TU PIN SECRETO (4 NÚMEROS) *</span>
+            </label>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem' }}>
+              🔒 <strong>Recuerda este PIN:</strong> Con estos 4 números abrirás tu sobre para ver a tu amigo secreto.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', maxWidth: '280px' }}>
+              <input
+                id="player-pin"
+                type={showPin ? 'text' : 'password'}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                className="form-input"
+                style={{
+                  fontSize: '1.6rem',
+                  letterSpacing: '0.4em',
+                  textAlign: 'center',
+                  fontWeight: 800,
+                  color: '#fbbf24',
+                  borderColor: pinError ? '#f87171' : 'rgba(251, 191, 36, 0.5)',
+                  padding: '0.6rem 0.5rem',
+                }}
+                value={pin}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '').substring(0, 4);
+                  setPin(val);
+                  if (val.length === 4) setPinError(null);
+                }}
+                placeholder="••••"
+                required
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '0.75rem', height: '100%' }}
+                onClick={() => setShowPin(!showPin)}
+                title={showPin ? 'Ocultar PIN' : 'Ver PIN'}
+              >
+                {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {pinError ? (
+              <div style={{ color: '#f87171', fontSize: '0.85rem', marginTop: '0.5rem', fontWeight: 600 }}>
+                ⚠️ {pinError}
+              </div>
+            ) : (
+              <span className="form-helper" style={{ color: 'var(--text-muted)', marginTop: '0.4rem', display: 'block' }}>
+                Ejemplo: 1234, 4567, 0825 (solo 4 dígitos).
+              </span>
+            )}
+          </div>
+
+          {/* Campo de WhatsApp Colombia (OPCIONAL) */}
           <div className="form-group" style={{ marginBottom: '1.25rem' }}>
             <label className="form-label" htmlFor="player-phone">
               <Phone size={15} color="#4ade80" />
-              <span>NÚMERO DE WHATSAPP / CELULAR (COLOMBIA) *</span>
+              <span>NÚMERO DE WHATSAPP / CELULAR (OPCIONAL)</span>
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <div
@@ -378,8 +384,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
                 }}
                 value={phone}
                 onChange={handlePhoneChange}
-                placeholder="3001234567"
-                required
+                placeholder="3001234567 (Opcional)"
                 disabled={isSubmitting}
               />
             </div>
@@ -389,7 +394,7 @@ export const PlayerRegistrationPage: React.FC<PlayerRegistrationPageProps> = ({ 
               </div>
             ) : (
               <span className="form-helper">
-                <strong>Obligatorio:</strong> Exactamente 10 dígitos iniciando en 3 (ej: 300 123 4567). Se usará para enviarte tu sobre secreto.
+                Opcional. Si no tienes celular propio puedes dejarlo en blanco.
               </span>
             )}
           </div>

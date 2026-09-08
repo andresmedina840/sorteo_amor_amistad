@@ -6,6 +6,7 @@ export class Participant {
   public readonly id: string;
   public name: string;
   public phone: string;
+  public pin: string;
   public giftWish: string;
   public familyId: string | null;
   /** Lista de IDs de otros participantes considerados familiares o a los que NO les puede regalar */
@@ -15,6 +16,7 @@ export class Participant {
     id?: string;
     name: string;
     phone?: string;
+    pin?: string;
     giftWish?: string;
     familyId?: string | null;
     excludedParticipantIds?: string[];
@@ -27,6 +29,7 @@ export class Participant {
     this.id = params.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `part_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     this.name = trimmedName;
     this.phone = params.phone ? params.phone.trim() : '';
+    this.pin = params.pin ? params.pin.trim() : '';
     this.giftWish = params.giftWish ? params.giftWish.trim() : '';
     this.familyId = params.familyId && params.familyId.trim().length > 0 ? params.familyId.trim() : null;
     this.excludedParticipantIds = params.excludedParticipantIds ? [...params.excludedParticipantIds] : [];
@@ -95,6 +98,7 @@ export class Participant {
   public copyWith(changes: Partial<{
     name: string;
     phone: string;
+    pin: string;
     giftWish: string;
     familyId: string | null;
     excludedParticipantIds: string[];
@@ -103,6 +107,7 @@ export class Participant {
       id: this.id,
       name: changes.name ?? this.name,
       phone: changes.phone ?? this.phone,
+      pin: changes.pin ?? this.pin,
       giftWish: changes.giftWish ?? this.giftWish,
       familyId: changes.familyId !== undefined ? changes.familyId : this.familyId,
       excludedParticipantIds: changes.excludedParticipantIds ?? this.excludedParticipantIds,

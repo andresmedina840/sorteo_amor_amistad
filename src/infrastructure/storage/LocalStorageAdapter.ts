@@ -8,6 +8,7 @@ export interface SavedParticipant {
   id: string;
   name: string;
   phone: string;
+  pin?: string;
   giftWish: string;
   familyId: string | null;
   excludedParticipantIds?: string[];
@@ -125,6 +126,7 @@ export class LocalStorageAdapter {
           id: p.id,
           name: p.name,
           phone: p.phone,
+          pin: p.pin,
           giftWish: p.giftWish,
           familyId: p.familyId,
           excludedParticipantIds: p.excludedParticipantIds,
@@ -188,6 +190,7 @@ export class LocalStorageAdapter {
           id: p.id,
           name: p.name,
           phone: p.phone,
+          pin: p.pin,
           giftWish: p.giftWish,
           familyId: p.familyId,
           excludedParticipantIds: p.excludedParticipantIds || [],

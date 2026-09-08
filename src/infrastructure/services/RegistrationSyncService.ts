@@ -18,7 +18,8 @@ export interface PlayerRegistrationData {
   id?: string;
   eventId: string;
   name: string;
-  phone: string;
+  phone?: string;
+  pin?: string;
   giftWish: string;
   registeredAt: number;
 }
@@ -253,6 +254,7 @@ export class RegistrationSyncService {
         id: player.id,
         name: player.name,
         phone: player.phone,
+        pin: player.pin,
         giftWish: player.giftWish,
       });
       return ok;
@@ -274,6 +276,7 @@ export class RegistrationSyncService {
         eventId: cloudRoomId,
         name: p.name,
         phone: p.phone,
+        pin: p.pin,
         giftWish: p.giftWish,
         registeredAt: Date.now(),
       }));
@@ -301,6 +304,7 @@ export class RegistrationSyncService {
       return new Participant({
         name: parsed.name,
         phone: parsed.phone,
+        pin: parsed.pin,
         giftWish: parsed.giftWish,
       });
     } catch {

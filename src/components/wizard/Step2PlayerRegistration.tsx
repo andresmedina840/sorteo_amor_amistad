@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Share2, Copy, Send, Users, UserPlus, Trash2, ArrowLeft, ArrowRight, Gift, Phone, Check, Sparkles, RefreshCw, Radio } from 'lucide-react';
+import { Share2, Copy, Send, Users, UserPlus, Trash2, ArrowLeft, ArrowRight, Gift, Phone, Check, Sparkles, RefreshCw, Radio, Key, Eye, EyeOff, Dices } from 'lucide-react';
 import { useGame } from '../../context/GameContext';
 import { RegistrationSyncService, type PlayerRegistrationData } from '../../infrastructure/services/RegistrationSyncService';
 import { showToast, showConfirmDialog } from '../../core/domain/utils/alertUtils';
@@ -13,13 +13,12 @@ export const Step2PlayerRegistration: React.FC = () => {
   const [cloudRoomId, setCloudRoomId] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Formulario manual opcional con nombres y apellidos separados en mayúsculas
-  const [manualFirstName, setManualFirstName] = useState('');
-  const [manualSecondName, setManualSecondName] = useState('');
-  const [manualFirstLastName, setManualFirstLastName] = useState('');
-  const [manualSecondLastName, setManualSecondLastName] = useState('');
+  // Formulario manual opcional con nombre único en mayúsculas
+  const [manualName, setManualName] = useState('');
+  const [manualPin, setManualPin] = useState('1234');
   const [manualPhone, setManualPhone] = useState('');
   const [manualWish, setManualWish] = useState('');
+  const [showPinsMap, setShowPinsMap] = useState<Record<string, boolean>>({});
 
   const syncService = useMemo(() => new RegistrationSyncService(), []);
   const [inviteUrl, setInviteUrl] = useState<string>('');
@@ -58,6 +57,7 @@ export const Step2PlayerRegistration: React.FC = () => {
             addParticipant({
               name: player.name.trim().toUpperCase(),
               phone: player.phone?.trim() || undefined,
+              pin: player.pin?.trim() || undefined,
               giftWish: player.giftWish?.trim() || undefined,
             });
             showToast(`🎉 ¡${player.name} se registró automáticamente!`, 'success');
@@ -101,6 +101,7 @@ export const Step2PlayerRegistration: React.FC = () => {
                 addParticipant({
                   name: player.name.trim().toUpperCase(),
                   phone: player.phone?.trim() || undefined,
+                  pin: player.pin?.trim() || undefined,
                   giftWish: player.giftWish?.trim() || undefined,
                 });
                 showToast(`🎉 ¡${player.name} acaba de registrarse!`, 'success');
@@ -148,29 +149,25 @@ ${inviteUrl}`;
 
   const handleAddManual = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanFirst = manualFirstName.trim().toUpperCase();
-    const cleanSecond = manualSecondName.trim().toUpperCase();
-    const cleanLast1 = manualFirstLastName.trim().toUpperCase();
-    const cleanLast2 = manualSecondLastName.trim().toUpperCase();
+    const fullUpperName = manualName.trim().toUpperCase();
 
-    if (!cleanFirst) {
-      showToast('Por favor escribe el PRIMER NOMBRE', 'warning');
-      return;
-    }
-    if (!cleanLast1) {
-      showToast('Por favor escribe el PRIMER APELLIDO', 'warning');
+    if (!fullUpperName) {
+      showToast('Por favor escribe el nombre del participante', 'warning');
       return;
     }
 
-    const fullUpperName = [cleanFirst, cleanSecond, cleanLast1, cleanLast2]
-      .filter(Boolean)
-      .join(' ');
+    // Validación de PIN manual
+    const cleanPin = manualPin.trim().replace(/\D/g, '');
+    if (cleanPin.length !== 4) {
+      showToast('El PIN debe tener exactamente 4 números', 'warning');
+      return;
+    }
 
     let cleanPhone: string | undefined = undefined;
     if (manualPhone.trim()) {
       const validation = validateColombiaPhone(manualPhone);
       if (!validation.isValid) {
-        showToast(validation.errorMessage || 'El celular debe tener 10 dígitos y comenzar por 3', 'warning');
+        showToast(validation.errorMessage || 'El celular debe tener 10 dígitos', 'warning');
         return;
       }
       cleanPhone = validation.cleanPhone;
@@ -179,16 +176,15 @@ ${inviteUrl}`;
     addParticipant({
       name: fullUpperName,
       phone: cleanPhone,
+      pin: cleanPin,
       giftWish: manualWish.trim() || undefined,
     });
 
-    setManualFirstName('');
-    setManualSecondName('');
-    setManualFirstLastName('');
-    setManualSecondLastName('');
+    setManualName('');
+    setManualPin(Math.floor(1000 + Math.random() * 9000).toString());
     setManualPhone('');
     setManualWish('');
-    showToast(`¡${fullUpperName} agregado a la lista!`, 'success');
+    showToast(`¡${fullUpperName} agregado con PIN ${cleanPin}!`, 'success');
   };
 
   const handleRemove = async (participant: Participant) => {
@@ -369,12 +365,42 @@ ${inviteUrl}`;
                     <strong style={{ fontSize: '1.1rem', color: '#fff' }}>
                       {index + 1}. {p.name}
                     </strong>
-                    {p.phone && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.15rem' }}>
-                        <Phone size={11} color="#4ade80" />
-                        <span style={{ color: '#4ade80', fontWeight: 600 }}>🇨🇴 +57 {formatColombiaPhone(p.phone)}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                      {/* PIN Secreto */}
+                      <div
+                        style={{
+                          fontSize: '0.78rem',
+                          background: 'rgba(251, 191, 36, 0.15)',
+                          border: '1px solid rgba(251, 191, 36, 0.4)',
+                          color: '#fbbf24',
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        <Key size={12} />
+                        <span>PIN: {showPinsMap[p.id] ? (p.pin || 'Sin PIN') : '••••'}</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowPinsMap(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
+                          style={{ background: 'transparent', border: 'none', color: '#fbbf24', cursor: 'pointer', padding: 0, display: 'flex' }}
+                          title={showPinsMap[p.id] ? 'Ocultar PIN' : 'Ver PIN'}
+                        >
+                          {showPinsMap[p.id] ? <EyeOff size={12} /> : <Eye size={12} />}
+                        </button>
                       </div>
-                    )}
+
+                      {p.phone && (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <Phone size={11} color="#4ade80" />
+                          <span style={{ color: '#4ade80', fontWeight: 600 }}>🇨🇴 +57 {formatColombiaPhone(p.phone)}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -408,57 +434,52 @@ ${inviteUrl}`;
           ➕ ¿Deseas agregar a alguien manualmente que no tenga celular? (Clic aquí)
         </summary>
         <form onSubmit={handleAddManual} style={{ marginTop: '1rem' }}>
+          <div className="form-group" style={{ marginBottom: '1rem' }}>
+            <label className="form-label">NOMBRE DEL PARTICIPANTE *</label>
+            <input
+              type="text"
+              className="form-input"
+              style={{ textTransform: 'uppercase' }}
+              value={manualName}
+              onChange={e => setManualName(e.target.value.toUpperCase())}
+              placeholder="EJ: CARLOS GÓMEZ"
+              required
+            />
+          </div>
           <div className="form-grid" style={{ marginBottom: '1rem' }}>
             <div className="form-group">
-              <label className="form-label">PRIMER NOMBRE *</label>
-              <input
-                type="text"
-                className="form-input"
-                style={{ textTransform: 'uppercase' }}
-                value={manualFirstName}
-                onChange={e => setManualFirstName(e.target.value.toUpperCase())}
-                placeholder="EJ: CARLOS"
-                required
-              />
+              <label className="form-label" style={{ color: '#fbbf24', fontWeight: 700 }}>
+                <Key size={13} />
+                <span>PIN Secreto (4 Números) *</span>
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  className="form-input"
+                  style={{ textAlign: 'center', fontWeight: 700, letterSpacing: '0.2em', color: '#fbbf24', borderColor: 'rgba(251, 191, 36, 0.4)' }}
+                  value={manualPin}
+                  onChange={e => setManualPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="1234"
+                  required
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '0.65rem 0.75rem', fontSize: '0.78rem' }}
+                  onClick={() => setManualPin(Math.floor(1000 + Math.random() * 9000).toString())}
+                  title="Generar PIN aleatorio"
+                >
+                  <Dices size={14} />
+                  <span>Azar</span>
+                </button>
+              </div>
+              <span className="form-helper">Con este PIN verá quién le salió</span>
             </div>
+
             <div className="form-group">
-              <label className="form-label">SEGUNDO NOMBRE (OPCIONAL)</label>
-              <input
-                type="text"
-                className="form-input"
-                style={{ textTransform: 'uppercase' }}
-                value={manualSecondName}
-                onChange={e => setManualSecondName(e.target.value.toUpperCase())}
-                placeholder="EJ: ALBERTO"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">PRIMER APELLIDO *</label>
-              <input
-                type="text"
-                className="form-input"
-                style={{ textTransform: 'uppercase' }}
-                value={manualFirstLastName}
-                onChange={e => setManualFirstLastName(e.target.value.toUpperCase())}
-                placeholder="EJ: GÓMEZ"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">SEGUNDO APELLIDO (OPCIONAL)</label>
-              <input
-                type="text"
-                className="form-input"
-                style={{ textTransform: 'uppercase' }}
-                value={manualSecondLastName}
-                onChange={e => setManualSecondLastName(e.target.value.toUpperCase())}
-                placeholder="EJ: PÉREZ"
-              />
-            </div>
-          </div>
-          <div className="form-grid">
-            <div className="form-group">
-              <label className="form-label">WhatsApp / Celular (10 dígitos empezando en 3)</label>
+              <label className="form-label">WhatsApp / Celular (Opcional)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <div style={{ background: 'rgba(255,255,255,0.06)', padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: '0.85rem', fontWeight: 600 }}>
                   🇨🇴 +57
@@ -470,10 +491,11 @@ ${inviteUrl}`;
                   className="form-input"
                   value={manualPhone}
                   onChange={e => setManualPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="3001234567"
+                  placeholder="3001234567 (Opcional)"
                 />
               </div>
             </div>
+
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="form-label">¿Qué regalos quiere? (Opcional)</label>
               <input

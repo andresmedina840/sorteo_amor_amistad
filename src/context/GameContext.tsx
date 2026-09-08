@@ -30,8 +30,8 @@ interface GameContextType {
     deliveryDateIso?: string;
     notes?: string;
   }) => void;
-  addParticipant: (data: { name: string; phone?: string; giftWish?: string; familyId?: string; excludedParticipantIds?: string[] }) => void;
-  updateParticipant: (id: string, data: { name?: string; phone?: string; giftWish?: string; familyId?: string | null; excludedParticipantIds?: string[] }) => void;
+  addParticipant: (data: { name: string; phone?: string; pin?: string; giftWish?: string; familyId?: string; excludedParticipantIds?: string[] }) => void;
+  updateParticipant: (id: string, data: { name?: string; phone?: string; pin?: string; giftWish?: string; familyId?: string | null; excludedParticipantIds?: string[] }) => void;
   toggleFamilyExclusion: (participantAId: string, participantBId: string) => void;
   setParticipantExclusions: (participantId: string, excludedIds: string[]) => void;
   removeParticipant: (id: string) => void;
@@ -129,11 +129,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setEventConfig(prev => prev.copyWith(changes));
   };
 
-  const addParticipant = (data: { name: string; phone?: string; giftWish?: string; familyId?: string; excludedParticipantIds?: string[] }) => {
+  const addParticipant = (data: { name: string; phone?: string; pin?: string; giftWish?: string; familyId?: string; excludedParticipantIds?: string[] }) => {
     try {
       const newPart = new Participant({
         name: data.name,
         phone: data.phone || '',
+        pin: data.pin || '',
         giftWish: data.giftWish || '',
         familyId: data.familyId || null,
         excludedParticipantIds: data.excludedParticipantIds || [],
@@ -145,7 +146,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const updateParticipant = (id: string, data: { name?: string; phone?: string; giftWish?: string; familyId?: string | null; excludedParticipantIds?: string[] }) => {
+  const updateParticipant = (id: string, data: { name?: string; phone?: string; pin?: string; giftWish?: string; familyId?: string | null; excludedParticipantIds?: string[] }) => {
     setParticipants(prev =>
       prev.map(p => {
         if (p.id !== id) return p;
