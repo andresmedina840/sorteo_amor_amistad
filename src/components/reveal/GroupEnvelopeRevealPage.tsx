@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Gift, Lock, Key, AlertCircle, Eye, EyeOff, Sparkles, ArrowLeft, RefreshCw, Calendar, DollarSign, Heart, ShieldCheck, UserCheck, RotateCcw } from 'lucide-react';
+import { Gift, Lock, Key, AlertCircle, Eye, EyeOff, Sparkles, ArrowLeft, RefreshCw, Calendar, DollarSign, Heart, ShieldCheck, UserCheck, RotateCcw, Search, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useGame } from '../../context/GameContext';
 
@@ -25,6 +25,7 @@ export const GroupEnvelopeRevealPage: React.FC<GroupEnvelopeRevealPageProps> = (
 
   // Estados de revelación
   const [selectedParticipantId, setSelectedParticipantId] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [inputPin, setInputPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -87,8 +88,18 @@ export const GroupEnvelopeRevealPage: React.FC<GroupEnvelopeRevealPageProps> = (
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'es'));
   }, [participantsList, pairsList]);
 
+  // Lista filtrada en tiempo real según lo que escribe el usuario
+  const filteredParticipants = useMemo(() => {
+    if (!searchTerm.trim()) return selectableParticipants;
+    const cleanQuery = searchTerm.trim().toLowerCase();
+    return selectableParticipants.filter(p =>
+      p.name.toLowerCase().includes(cleanQuery)
+    );
+  }, [selectableParticipants, searchTerm]);
+
   const handleSelectParticipant = (id: string) => {
     setSelectedParticipantId(id);
+    setSearchTerm('');
     setInputPin('');
     setPinError(null);
     setRevealedReceiver(null);
@@ -346,7 +357,7 @@ export const GroupEnvelopeRevealPage: React.FC<GroupEnvelopeRevealPageProps> = (
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25 }}
               >
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
                   <div
                     style={{
                       width: '56px',
@@ -362,41 +373,170 @@ export const GroupEnvelopeRevealPage: React.FC<GroupEnvelopeRevealPageProps> = (
                   >
                     <UserCheck size={28} color="#fbbf24" />
                   </div>
-                  <h2 style={{ fontSize: '1.35rem', color: '#fff', margin: '0 0 0.4rem' }}>
+                  <h2 style={{ fontSize: '1.35rem', color: '#fff', margin: '0 0 0.35rem', fontWeight: 800 }}>
                     1. ¿Quién eres tú?
                   </h2>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', margin: 0 }}>
-                    Busca tu nombre en la lista para acceder a tu sobre privado.
+                    Escribe tu nombre o elígelo tocando tu tarjeta abajo:
                   </p>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '1.5rem', maxWidth: '440px', margin: '0 auto 1.5rem' }}>
-                  <select
-                    id="select-participant"
-                    className="form-input"
+                {/* Buscador interactivo en tiempo real */}
+                <div style={{ maxWidth: '440px', margin: '0 auto 1.25rem', position: 'relative' }}>
+                  <div
                     style={{
-                      fontSize: '1.15rem',
-                      padding: '0.9rem 1rem',
-                      borderRadius: 'var(--radius-md)',
-                      border: '2px solid rgba(251, 191, 36, 0.4)',
-                      background: 'rgba(15, 10, 25, 0.95)',
-                      color: '#fbbf24',
-                      fontWeight: 700,
-                      textAlign: 'center',
-                      cursor: 'pointer',
+                      position: 'absolute',
+                      left: '1rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
                     }}
-                    value={selectedParticipantId}
-                    onChange={e => handleSelectParticipant(e.target.value)}
                   >
-                    <option value="" style={{ color: '#fff', background: '#1c1326' }}>
-                      👇 Haz clic aquí y elige tu nombre...
-                    </option>
-                    {selectableParticipants.map(p => (
-                      <option key={p.id} value={p.id} style={{ color: '#fff', background: '#1c1326' }}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    <Search size={18} color="#fbbf24" />
+                  </div>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="🔍 Escribe tu nombre para buscar..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && filteredParticipants.length > 0) {
+                        e.preventDefault();
+                        handleSelectParticipant(filteredParticipants[0].id);
+                      }
+                    }}
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      padding: '0.85rem 2.5rem 0.85rem 2.85rem',
+                      fontSize: '1.05rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '2px solid rgba(251, 191, 36, 0.45)',
+                      background: 'rgba(15, 10, 25, 0.95)',
+                      color: '#fff',
+                      outline: 'none',
+                      boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)',
+                    }}
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      style={{
+                        position: 'absolute',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                      }}
+                      title="Borrar búsqueda"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Lista de tarjetas táctiles de participantes */}
+                <div
+                  style={{
+                    maxHeight: '280px',
+                    overflowY: 'auto',
+                    maxWidth: '440px',
+                    margin: '0 auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                    paddingRight: '0.25rem',
+                  }}
+                >
+                  {filteredParticipants.length > 0 ? (
+                    filteredParticipants.map(p => (
+                      <motion.button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleSelectParticipant(p.id)}
+                        whileHover={{ scale: 1.02, backgroundColor: 'rgba(251, 191, 36, 0.16)' }}
+                        whileTap={{ scale: 0.98 }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.75rem 1rem',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(251, 191, 36, 0.25)',
+                          borderRadius: '12px',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'all 0.15s ease',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: 'linear-gradient(135deg, #e11d48 0%, #fb7185 100%)',
+                              color: '#fff',
+                              fontWeight: 900,
+                              fontSize: '1rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(225, 29, 72, 0.35)',
+                            }}
+                          >
+                            {p.name.charAt(0)}
+                          </div>
+                          <span style={{ fontSize: '1.08rem', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.01em' }}>
+                            {p.name}
+                          </span>
+                        </div>
+
+                        <span
+                          style={{
+                            fontSize: '0.8rem',
+                            color: '#fbbf24',
+                            fontWeight: 600,
+                            background: 'rgba(251, 191, 36, 0.12)',
+                            padding: '0.3rem 0.65rem',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(251, 191, 36, 0.25)',
+                          }}
+                        >
+                          Elegir ➔
+                        </span>
+                      </motion.button>
+                    ))
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '1.75rem 1rem', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '12px' }}>
+                      <p style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', color: '#fca5a5' }}>
+                        No se encontró ningún participante llamado "<strong>{searchTerm}</strong>"
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
+                      >
+                        Ver todos los nombres ({selectableParticipants.length})
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ) : (
