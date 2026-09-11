@@ -66,7 +66,7 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
   }, [payload?.deliveryDateIso]);
 
   // Verificar el PIN ingresado
-  const handleVerifyPin = () => {
+  const verifyPinValue = (pinVal: string) => {
     if (!payload) return;
 
     if (pinAttempts >= MAX_PIN_ATTEMPTS) {
@@ -74,7 +74,7 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
       return;
     }
 
-    const trimmedPin = enteredPin.trim();
+    const trimmedPin = pinVal.trim();
     if (!trimmedPin) {
       setPinError('Por favor ingresa tu PIN de 4 dígitos');
       return;
@@ -95,6 +95,10 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
       );
       setEnteredPin('');
     }
+  };
+
+  const handleVerifyPin = () => {
+    verifyPinValue(enteredPin);
   };
 
   // Manejar Enter en campo de PIN
@@ -241,6 +245,11 @@ export const RevealPage: React.FC<RevealPageProps> = ({ token, onGoHome }) => {
                 const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                 setEnteredPin(val);
                 setPinError('');
+                if (val.length === 4) {
+                  setTimeout(() => {
+                    verifyPinValue(val);
+                  }, 120);
+                }
               }}
               onKeyDown={handlePinKeyDown}
               disabled={isBlocked}

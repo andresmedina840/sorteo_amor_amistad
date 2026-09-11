@@ -120,7 +120,7 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
     setPhase(PHASES.SELECT_NAME);
   };
 
-  const handleVerifyPin = () => {
+  const verifyPinValue = (pinVal: string) => {
     if (!selectedEntry) return;
 
     if (pinAttempts >= MAX_PIN_ATTEMPTS) {
@@ -128,7 +128,7 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
       return;
     }
 
-    const trimmed = enteredPin.trim();
+    const trimmed = pinVal.trim();
     if (!trimmed || trimmed.length < 4) {
       setPinError('Ingresa tu PIN completo de 4 dígitos');
       return;
@@ -153,6 +153,10 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
       );
       setEnteredPin('');
     }
+  };
+
+  const handleVerifyPin = () => {
+    verifyPinValue(enteredPin);
   };
 
   const handlePinKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -388,7 +392,16 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
                   inputMode="numeric"
                   maxLength={4}
                   value={enteredPin}
-                  onChange={e => { setEnteredPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError(''); }}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setEnteredPin(val);
+                    setPinError('');
+                    if (val.length === 4) {
+                      setTimeout(() => {
+                        verifyPinValue(val);
+                      }, 120);
+                    }
+                  }}
                   onKeyDown={handlePinKeyDown}
                   disabled={isBlocked}
                   placeholder="••••"

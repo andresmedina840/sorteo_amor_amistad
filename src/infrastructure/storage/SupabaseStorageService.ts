@@ -135,7 +135,7 @@ export class SupabaseStorageService {
         notes: groupData.notes || '',
       });
 
-      const participants: Participant[] = (participantsData || []).map(
+      const rawParticipants: Participant[] = (participantsData || []).map(
         p => new Participant({
           id: p.id,
           name: p.name,
@@ -146,6 +146,26 @@ export class SupabaseStorageService {
           excludedParticipantIds: p.excluded_participant_ids || [],
         })
       );
+
+      // Deduplicar participantes por nombre normalizado, dando prioridad al que está presente en pairs
+      const activeIdsInPairs = new Set<string>();
+      if (groupData.pairs && Array.isArray(groupData.pairs)) {
+        groupData.pairs.forEach((p: any) => {
+          if (p.giverId) activeIdsInPairs.add(p.giverId);
+          if (p.receiverId) activeIdsInPairs.add(p.receiverId);
+        });
+      }
+
+      const uniqueParticipantsMap = new Map<string, Participant>();
+      for (const p of rawParticipants) {
+        const norm = p.name.trim().toUpperCase();
+        if (!uniqueParticipantsMap.has(norm)) {
+          uniqueParticipantsMap.set(norm, p);
+        } else if (activeIdsInPairs.has(p.id)) {
+          uniqueParticipantsMap.set(norm, p);
+        }
+      }
+      const participants = Array.from(uniqueParticipantsMap.values());
 
       let pairs: DrawPair[] | null = null;
       if (groupData.pairs && groupData.pairs.length > 0) {
@@ -222,17 +242,27 @@ export class SupabaseStorageService {
     if (!client || !groupId) return false;
 
     try {
-      const partId = participant.id || 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-      const { error } = await client.from('sorteo_participants').insert({
+      const normalizedName = participant.name.trim().toUpperCase();
+
+      // Verificar si ya existe un participante con este nombre en este grupo
+      const { data: existing } = await client
+        .from('sorteo_participants')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('name', normalizedName)
+        .maybeSingle();
+
+      const partId = existing?.id || participant.id || 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const { error } = await client.from('sorteo_participants').upsert({
         id: partId,
         group_id: groupId,
-        name: participant.name.trim().toUpperCase(),
+        name: normalizedName,
         phone: participant.phone?.trim() || '',
         pin: participant.pin?.trim() || '',
         gift_wish: participant.giftWish?.trim() || '',
         family_id: null,
         excluded_participant_ids: [],
-      });
+      }, { onConflict: 'id' });
 
       return !error;
     } catch (err) {
