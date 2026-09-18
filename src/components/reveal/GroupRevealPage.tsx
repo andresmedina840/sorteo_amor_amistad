@@ -3,9 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, Sparkles, DollarSign, Calendar, Gift, CheckCircle2, Lock,
   ArrowLeft, Key, Eye, EyeOff, ShieldCheck, AlertCircle, Users, ChevronRight,
+  Save, RefreshCw,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { WebCryptoService } from '../../infrastructure/services/WebCryptoService';
+import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService';
+import { isSupabaseConfigured } from '../../infrastructure/storage/supabaseClient';
 import type { GroupRevealPayload, GroupRevealEntry } from '../../core/domain/services/ICryptoService';
 import { formatColombiaDateTime, getTimeRemaining } from '../../core/domain/utils/dateFormatters';
 import { showToast } from '../../core/domain/utils/alertUtils';
@@ -78,6 +81,11 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
   const [pinError, setPinError] = useState('');
   const [pinAttempts, setPinAttempts] = useState(0);
 
+  // ─── Estados para editar deseos propios ────────────────────────────
+  const [myWish, setMyWish] = useState('');
+  const [isSavingWish, setIsSavingWish] = useState(false);
+  const [wishSavedSuccess, setWishSavedSuccess] = useState(false);
+
   // ─── Contador regresivo ────────────────────────────────────────────
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: false });
 
@@ -140,6 +148,26 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
 
     if (isValid) {
       setPhase(PHASES.REVEALED);
+      setMyWish('');
+      setWishSavedSuccess(false);
+
+      // Cargar gustos frescos desde Supabase si está disponible
+      if (isSupabaseConfigured()) {
+        SupabaseStorageService.getAllGroups().then(async groups => {
+          if (groups.length > 0) {
+            const participants = await SupabaseStorageService.getParticipants(groups[0].id);
+            const myPart = participants.find(p => p.name.trim().toUpperCase() === selectedEntry.giverName.trim().toUpperCase());
+            if (myPart && myPart.giftWish) {
+              setMyWish(myPart.giftWish);
+            }
+            const recPart = participants.find(p => p.name.trim().toUpperCase() === selectedEntry.receiverName.trim().toUpperCase());
+            if (recPart && recPart.giftWish) {
+              setSelectedEntry(prev => prev ? { ...prev, receiverWish: recPart.giftWish } : null);
+            }
+          }
+        }).catch(() => {});
+      }
+
       launchConfetti();
       showToast('¡Sobre abierto! Guarda bien este secreto 🤫', 'success');
     } else {
@@ -163,11 +191,40 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
     if (e.key === 'Enter') handleVerifyPin();
   };
 
+  const handleSaveMyWish = async () => {
+    if (!selectedEntry) return;
+    setIsSavingWish(true);
+    try {
+      const cleanWish = myWish.trim();
+      if (isSupabaseConfigured()) {
+        const groups = await SupabaseStorageService.getAllGroups();
+        if (groups.length > 0) {
+          await SupabaseStorageService.updateParticipantGiftWish(
+            groups[0].id,
+            '',
+            cleanWish,
+            selectedEntry.giverName
+          );
+        }
+      }
+      setWishSavedSuccess(true);
+      showToast('¡Tus gustos fueron guardados con éxito!', 'success');
+      setTimeout(() => setWishSavedSuccess(false), 4000);
+    } catch (err) {
+      console.warn('Error guardando gustos:', err);
+      showToast('No se pudieron guardar tus gustos', 'warning');
+    } finally {
+      setIsSavingWish(false);
+    }
+  };
+
   const handleCloseEnvelope = () => {
     setSelectedEntry(null);
     setEnteredPin('');
     setPinError('');
     setPinAttempts(0);
+    setMyWish('');
+    setWishSavedSuccess(false);
     setPhase(PHASES.SELECT_NAME);
   };
 
@@ -507,16 +564,93 @@ export const GroupRevealPage: React.FC<GroupRevealPageProps> = ({ token, onGoHom
                   border: '1px solid rgba(251, 191, 36, 0.35)',
                   borderRadius: 'var(--radius-md)',
                   padding: '1.25rem', textAlign: 'left',
-                  maxWidth: '460px', margin: '0 auto 1.75rem',
+                  maxWidth: '460px', margin: '0 auto 1.5rem',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#fbbf24', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.4rem' }}>
                   <Gift size={16} />
-                  <span>REGALOS O GUSTOS QUE LE GUSTARÍA RECIBIR:</span>
+                  <span>SUGERENCIAS DE REGALOS QUE LE GUSTARÍA RECIBIR A {selectedEntry.receiverName.toUpperCase()}:</span>
                 </div>
                 <p style={{ margin: 0, fontSize: '1.05rem', color: '#fef08a', fontStyle: selectedEntry.receiverWish ? 'normal' : 'italic' }}>
                   {selectedEntry.receiverWish ? `"${selectedEntry.receiverWish}"` : 'No especificó sugerencias particulares. ¡Sorpréndele con un gran detalle!'}
                 </p>
+              </motion.div>
+
+              {/* Tarjeta interactiva: ¿Qué te gustaría recibir a ti? */}
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+                style={{
+                  background: 'rgba(15, 23, 42, 0.65)',
+                  border: '1.5px dashed rgba(251, 191, 36, 0.6)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1.25rem', textAlign: 'left',
+                  maxWidth: '460px', margin: '0 auto 1.75rem',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#fbbf24', fontWeight: 700, fontSize: '0.9rem' }}>
+                    <Sparkles size={16} />
+                    <span>¿QUÉ TE GUSTARÍA RECIBIR A TI, {selectedEntry.giverName}?</span>
+                  </div>
+                  {wishSavedSuccess && (
+                    <span style={{ fontSize: '0.78rem', color: '#4ade80', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <CheckCircle2 size={13} /> ¡Guardado!
+                    </span>
+                  )}
+                </div>
+
+                <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  Tu amigo secreto verá esto cuando abra su sobre digital. Puedes escribirlo o cambiarlo en cualquier momento.
+                </p>
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={myWish}
+                    onChange={e => {
+                      setMyWish(e.target.value);
+                      setWishSavedSuccess(false);
+                    }}
+                    placeholder="Ej: Chocolates oscuros, libro, camiseta M..."
+                    style={{
+                      flex: '1 1 220px',
+                      fontSize: '0.9rem',
+                      background: 'rgba(13, 8, 22, 0.85)',
+                      borderColor: wishSavedSuccess ? '#4ade80' : 'rgba(251, 191, 36, 0.5)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSaveMyWish}
+                    disabled={isSavingWish}
+                    style={{
+                      padding: '0.6rem 1.1rem',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                    }}
+                  >
+                    {isSavingWish ? (
+                      <>
+                        <RefreshCw size={14} className="spin-animation" />
+                        <span>Guardando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        <span>Guardar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </motion.div>
 
               {/* Badge de secreto */}

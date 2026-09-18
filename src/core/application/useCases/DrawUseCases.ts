@@ -4,6 +4,7 @@ import { DrawPair } from '../../domain/entities/DrawPair';
 import type { IDrawEngine } from '../../domain/services/IDrawEngine';
 import type { ICryptoService, SecretRevealPayload, GroupRevealPayload, GroupRevealEntry } from '../../domain/services/ICryptoService';
 import { formatColombiaDateTime } from '../../domain/utils/dateFormatters';
+import { isSupabaseConfigured } from '../../../infrastructure/storage/supabaseClient';
 
 export interface ShareableItem {
   giver: Participant;
@@ -72,9 +73,17 @@ export class DrawUseCases {
       entries,
     };
 
-    const token = await this.cryptoService.encodeGroupPayload(payload);
     const cleanBaseUrl = baseUrl.split('#')[0].split('?')[0];
-    const shareUrl = `${cleanBaseUrl}#sorteo=${token}`;
+    let shareUrl = '';
+
+    if (isSupabaseConfigured() && eventConfig.id) {
+      // Enlace ultra-corto dinámico conectado a base de datos
+      shareUrl = `${cleanBaseUrl}#sobres=${eventConfig.id}`;
+    } else {
+      // Fallback offline autónomo
+      const token = await this.cryptoService.encodeGroupPayload(payload);
+      shareUrl = `${cleanBaseUrl}#sorteo=${token}`;
+    }
 
     const formattedDate = formatColombiaDateTime(eventConfig.deliveryDateIso);
     const formattedBudget = eventConfig.getFormattedBudget();

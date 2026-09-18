@@ -400,6 +400,47 @@ export class SupabaseStorageService {
   }
 
   /**
+   * Actualiza los gustos o lista de deseos de un participante en Supabase
+   */
+  public static async updateParticipantGiftWish(
+    groupId: string,
+    participantId: string,
+    giftWish: string,
+    participantName?: string
+  ): Promise<boolean> {
+    const client = getSupabaseClient();
+    if (!client || !groupId) return false;
+
+    try {
+      const trimmedWish = giftWish.trim();
+
+      // 1. Actualizar por ID
+      if (participantId) {
+        await client
+          .from('sorteo_participants')
+          .update({ gift_wish: trimmedWish })
+          .eq('group_id', groupId)
+          .eq('id', participantId);
+      }
+
+      // 2. Si se proporciona nombre, actualizar cualquier fila con el mismo nombre para consistencia
+      if (participantName && participantName.trim()) {
+        const normalizedName = participantName.trim().toUpperCase();
+        await client
+          .from('sorteo_participants')
+          .update({ gift_wish: trimmedWish })
+          .eq('group_id', groupId)
+          .ilike('name', normalizedName);
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('Error al actualizar gustos del participante en Supabase:', err);
+      return false;
+    }
+  }
+
+  /**
    * Elimina un grupo y sus participantes en cascada
    */
   public static async deleteGroup(groupId: string): Promise<boolean> {

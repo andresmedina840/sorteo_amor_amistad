@@ -280,7 +280,7 @@ Guarda este archivo en tu computador para tener respaldo permanente.
           </div>
 
           <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-            <strong>¡La forma más fácil para todos!</strong> Comparte este único enlace con todo el grupo. Cada participante entra, selecciona su nombre, digita su <strong>PIN de 4 dígitos</strong> y descubre a su amigo secreto de forma 100% privada. <strong>Funciona desde cualquier celular sin necesidad de base de datos.</strong>
+            <strong>¡Enlace corto y permanente para todos!</strong> Comparte este único enlace con todo el grupo por WhatsApp. Cada participante entra, selecciona su nombre, digita su <strong>PIN de 4 dígitos</strong> y descubre a su amigo secreto de forma 100% privada. Además, <strong>cada jugador puede ingresar y actualizar lo que le gustaría recibir</strong> para que su amigo secreto lo vea en tiempo real.
           </p>
 
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
