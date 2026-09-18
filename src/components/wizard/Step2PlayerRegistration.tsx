@@ -22,6 +22,8 @@ export const Step2PlayerRegistration: React.FC = () => {
   const syncService = useMemo(() => new RegistrationSyncService(), []);
   const [inviteUrl, setInviteUrl] = useState<string>('');
   const participantsRef = useRef<Participant[]>(participants);
+  // Registro de nombres recientemente eliminados para prevenir carreras con polling o SSE
+  const recentlyDeletedNamesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     participantsRef.current = participants;
@@ -47,14 +49,24 @@ export const Step2PlayerRegistration: React.FC = () => {
     try {
       const cloudPlayers = await syncService.getCloudPlayers(cloudRoomId);
       if (cloudPlayers && cloudPlayers.length > 0) {
-        const currentList = participantsRef.current;
+        const knownNames = new Set(
+          participantsRef.current.map(p => p.name.trim().toUpperCase())
+        );
+
         for (const player of cloudPlayers) {
-          const alreadyExists = currentList.some(
-            p => p.name.trim().toLowerCase() === player.name.trim().toLowerCase()
-          );
-          if (!alreadyExists) {
+          const normName = player.name.trim().toUpperCase();
+          if (!normName) continue;
+
+          // Si fue eliminado recientemente en esta sesión, ignorarlo
+          if (recentlyDeletedNamesRef.current.has(normName)) {
+            continue;
+          }
+
+          if (!knownNames.has(normName)) {
+            knownNames.add(normName);
             addParticipant({
-              name: player.name.trim().toUpperCase(),
+              id: player.id,
+              name: normName,
               phone: player.phone?.trim() || undefined,
               pin: player.pin?.trim() || undefined,
               giftWish: player.giftWish?.trim() || undefined,
@@ -92,13 +104,18 @@ export const Step2PlayerRegistration: React.FC = () => {
           if (data && data.message) {
             const player = JSON.parse(data.message) as PlayerRegistrationData;
             if (player && player.name) {
+              const normName = player.name.trim().toUpperCase();
+              if (recentlyDeletedNamesRef.current.has(normName)) {
+                return;
+              }
               const currentList = participantsRef.current;
               const alreadyExists = currentList.some(
-                p => p.name.trim().toLowerCase() === player.name.trim().toLowerCase()
+                p => p.name.trim().toUpperCase() === normName
               );
               if (!alreadyExists) {
                 addParticipant({
-                  name: player.name.trim().toUpperCase(),
+                  id: player.id,
+                  name: normName,
                   phone: player.phone?.trim() || undefined,
                   pin: player.pin?.trim() || undefined,
                   giftWish: player.giftWish?.trim() || undefined,
@@ -182,6 +199,12 @@ ${inviteUrl}`;
       'Cancelar'
     );
     if (confirmed) {
+      const normName = participant.name.trim().toUpperCase();
+      recentlyDeletedNamesRef.current.add(normName);
+      setTimeout(() => {
+        recentlyDeletedNamesRef.current.delete(normName);
+      }, 10000);
+
       removeParticipant(participant.id);
       showToast(`${participant.name} eliminado`, 'info');
     }

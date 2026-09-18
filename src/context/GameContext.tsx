@@ -30,7 +30,7 @@ interface GameContextType {
     deliveryDateIso?: string;
     notes?: string;
   }) => void;
-  addParticipant: (data: { name: string; phone?: string; pin?: string; giftWish?: string; familyId?: string; excludedParticipantIds?: string[] }) => void;
+  addParticipant: (data: { id?: string; name: string; phone?: string; pin?: string; giftWish?: string; familyId?: string; excludedParticipantIds?: string[] }) => void;
   updateParticipant: (id: string, data: { name?: string; phone?: string; pin?: string; giftWish?: string; familyId?: string | null; excludedParticipantIds?: string[] }) => void;
   toggleFamilyExclusion: (participantAId: string, participantBId: string) => void;
   setParticipantExclusions: (participantId: string, excludedIds: string[]) => void;
@@ -158,17 +158,50 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setEventConfig(prev => prev.copyWith(changes));
   };
 
-  const addParticipant = (data: { name: string; phone?: string; pin?: string; giftWish?: string; familyId?: string; excludedParticipantIds?: string[] }) => {
+  const addParticipant = (data: {
+    id?: string;
+    name: string;
+    phone?: string;
+    pin?: string;
+    giftWish?: string;
+    familyId?: string;
+    excludedParticipantIds?: string[];
+  }) => {
     try {
-      const newPart = new Participant({
-        name: data.name,
-        phone: data.phone || '',
-        pin: data.pin || '',
-        giftWish: data.giftWish || '',
-        familyId: data.familyId || null,
-        excludedParticipantIds: data.excludedParticipantIds || [],
+      const trimmedName = data.name.trim().toUpperCase();
+      if (!trimmedName) return;
+
+      setParticipants(prev => {
+        // Verificar si ya existe un participante con este nombre o este id
+        const existingIndex = prev.findIndex(
+          p => (data.id && p.id === data.id) || p.name.trim().toUpperCase() === trimmedName
+        );
+
+        if (existingIndex !== -1) {
+          // Ya existe en la lista: actualizar datos sin duplicar
+          const updated = [...prev];
+          const existing = updated[existingIndex];
+          updated[existingIndex] = existing.copyWith({
+            phone: data.phone !== undefined ? data.phone : existing.phone,
+            pin: data.pin !== undefined ? data.pin : existing.pin,
+            giftWish: data.giftWish !== undefined ? data.giftWish : existing.giftWish,
+            familyId: data.familyId !== undefined ? data.familyId : existing.familyId,
+            excludedParticipantIds: data.excludedParticipantIds !== undefined ? data.excludedParticipantIds : existing.excludedParticipantIds,
+          });
+          return updated;
+        }
+
+        const newPart = new Participant({
+          id: data.id,
+          name: trimmedName,
+          phone: data.phone || '',
+          pin: data.pin || '',
+          giftWish: data.giftWish || '',
+          familyId: data.familyId || null,
+          excludedParticipantIds: data.excludedParticipantIds || [],
+        });
+        return [...prev, newPart];
       });
-      setParticipants(prev => [...prev, newPart]);
       setErrorMessage(null);
     } catch (err: any) {
       setErrorMessage(err.message || 'Error al agregar participante');
@@ -238,12 +271,21 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const removeParticipant = (id: string) => {
+    const toRemove = participants.find(p => p.id === id);
+
     setParticipants(prev => {
       // Remover participante y limpiar referencias a su ID en los demás
       return prev
         .filter(p => p.id !== id)
         .map(p => p.removeExclusion(id));
     });
+
+    // Eliminar inmediatamente de la base de datos Supabase
+    if (isSupabaseConfigured() && eventConfig.id) {
+      SupabaseStorageService.deleteParticipant(eventConfig.id, id, toRemove?.name).catch(err => {
+        console.warn('Error al eliminar participante de Supabase:', err);
+      });
+    }
   };
 
   const executeDraw = async (): Promise<boolean> => {

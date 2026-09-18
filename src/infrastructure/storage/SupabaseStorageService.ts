@@ -68,7 +68,7 @@ export class SupabaseStorageService {
         return false;
       }
 
-      // Si hay participantes, sincronizarlos
+      // Sincronizar participantes con Supabase
       if (participants.length > 0) {
         const participantRows: Partial<SupabaseParticipantRow>[] = participants.map(p => ({
           id: p.id,
@@ -88,6 +88,26 @@ export class SupabaseStorageService {
         if (partError) {
           console.warn('Error al guardar participantes en Supabase:', partError);
         }
+
+        // Limpiar en Supabase los participantes eliminados que ya no están en la lista activa
+        const activeIds = participants.map(p => p.id);
+        if (activeIds.length > 0) {
+          const { error: cleanupError } = await client
+            .from('sorteo_participants')
+            .delete()
+            .eq('group_id', eventConfig.id)
+            .not('id', 'in', `(${activeIds.map(id => `"${id}"`).join(',')})`);
+
+          if (cleanupError) {
+            console.warn('Error al limpiar participantes removidos en Supabase:', cleanupError);
+          }
+        }
+      } else {
+        // Si no hay ningún participante, limpiar todos los participantes de este grupo
+        await client
+          .from('sorteo_participants')
+          .delete()
+          .eq('group_id', eventConfig.id);
       }
 
       return true;
@@ -244,15 +264,16 @@ export class SupabaseStorageService {
     try {
       const normalizedName = participant.name.trim().toUpperCase();
 
-      // Verificar si ya existe un participante con este nombre en este grupo
-      const { data: existing } = await client
+      // Verificar si ya existe algún participante con este nombre en este grupo
+      const { data: existingRows } = await client
         .from('sorteo_participants')
         .select('id')
         .eq('group_id', groupId)
-        .eq('name', normalizedName)
-        .maybeSingle();
+        .ilike('name', normalizedName);
 
+      const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null;
       const partId = existing?.id || participant.id || 'p_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+
       const { error } = await client.from('sorteo_participants').upsert({
         id: partId,
         group_id: groupId,
@@ -264,6 +285,12 @@ export class SupabaseStorageService {
         excluded_participant_ids: [],
       }, { onConflict: 'id' });
 
+      // Si había duplicados previos con este mismo nombre, eliminar los sobrantes
+      if (existingRows && existingRows.length > 1) {
+        const excessIds = existingRows.slice(1).map(r => r.id);
+        client.from('sorteo_participants').delete().in('id', excessIds).then(() => {}, () => {});
+      }
+
       return !error;
     } catch (err) {
       console.warn('Error al registrar participante en Supabase:', err);
@@ -273,6 +300,7 @@ export class SupabaseStorageService {
 
   /**
    * Obtiene los participantes actuales de un grupo desde Supabase
+   * Deduplica por nombre normalizado y auto-elimina registros duplicados huérfanos.
    */
   public static async getParticipants(groupId: string): Promise<Participant[]> {
     const client = getSupabaseClient();
@@ -287,7 +315,37 @@ export class SupabaseStorageService {
 
       if (error || !data) return [];
 
-      return data.map(
+      const uniqueByName = new Map<string, any>();
+      const duplicateIdsToDelete: string[] = [];
+
+      for (const p of data) {
+        const normName = (p.name || '').trim().toUpperCase();
+        if (!normName) continue;
+        if (!uniqueByName.has(normName)) {
+          uniqueByName.set(normName, p);
+        } else {
+          // Registro duplicado en la BD: marcar para eliminar
+          duplicateIdsToDelete.push(p.id);
+        }
+      }
+
+      // Limpieza asíncrona de duplicados en la base de datos
+      if (duplicateIdsToDelete.length > 0) {
+        client
+          .from('sorteo_participants')
+          .delete()
+          .in('id', duplicateIdsToDelete)
+          .then(
+            () => {
+              console.info(`Limpieza automática: ${duplicateIdsToDelete.length} duplicados eliminados de Supabase.`);
+            },
+            (err: any) => {
+              console.warn('Error en autolimpieza de duplicados:', err);
+            }
+          );
+      }
+
+      return Array.from(uniqueByName.values()).map(
         p => new Participant({
           id: p.id,
           name: p.name,
@@ -300,6 +358,44 @@ export class SupabaseStorageService {
       );
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Elimina un participante de Supabase tanto por ID como por nombre (para limpiar duplicados)
+   */
+  public static async deleteParticipant(
+    groupId: string,
+    participantId: string,
+    participantName?: string
+  ): Promise<boolean> {
+    const client = getSupabaseClient();
+    if (!client || !groupId) return false;
+
+    try {
+      // 1. Eliminar por ID exacto
+      if (participantId) {
+        await client
+          .from('sorteo_participants')
+          .delete()
+          .eq('group_id', groupId)
+          .eq('id', participantId);
+      }
+
+      // 2. Si se suministra el nombre, eliminar también cualquier fila duplicada residual con el mismo nombre
+      if (participantName && participantName.trim()) {
+        const normalizedName = participantName.trim().toUpperCase();
+        await client
+          .from('sorteo_participants')
+          .delete()
+          .eq('group_id', groupId)
+          .ilike('name', normalizedName);
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('Error al eliminar participante de Supabase:', err);
+      return false;
     }
   }
 
